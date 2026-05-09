@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scrape {{ marketplace|title }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">← Kembali</a>
+            <h1>🕷️ Scrape {{ marketplace|title }}</h1>
+        </header>
+
+        <!-- FORM -->
+        <section class="form-section" id="form-section">
+            <form id="scrape-form">
+                <div class="form-group">
+                    <label>Keyword Pencarian</label>
+                    <input type="text" id="keyword" placeholder="contoh: laptop, sepatu, handphone" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Jumlah Halaman</label>
+                        <input type="number" id="pages" value="3" min="1" max="20">
+                    </div>
+                    <div class="form-group">
+                        <label>Mode</label>
+                        <select id="mode">
+                            <option value="cepat">⚡ Cepat (Seller Individu = skip)</option>
+                            <option value="lengkap">🔍 Lengkap (Fetch detail seller)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Harga Minimum (Rp)</label>
+                        <input type="number" id="min_price" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Harga Maximum (Rp)</label>
+                        <input type="number" id="max_price" placeholder="999999999">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Rating Minimum</label>
+                        <select id="min_rating">
+                            <option value="">Semua</option>
+                            <option value="4">⭐ 4 ke atas</option>
+                            <option value="3">⭐ 3 ke atas</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Urutkan</label>
+                        <select id="sort">
+                            <option value="0">Paling Sesuai</option>
+                            <option value="4">Terlaris</option>
+                            <option value="1">Terbaru</option>
+                            <option value="2">Harga Terendah</option>
+                            <option value="3">Harga Tertinggi</option>
+                        </select>
+                    </div>
+                </div>
+
+                {% if marketplace == "blibli" %}
+                <div class="form-group">
+                    <label>Lokasi</label>
+                    <select id="location">
+                        <option value="">Semua Lokasi</option>
+                        <option value="DKI+Jakarta">DKI Jakarta</option>
+                        <option value="Jawa+Barat">Jawa Barat</option>
+                        <option value="Jawa+Tengah">Jawa Tengah</option>
+                        <option value="Jawa+Timur">Jawa Timur</option>
+                        <option value="Banten">Banten</option>
+                        <option value="DI+Yogyakarta">DI Yogyakarta</option>
+                        <option value="Bali">Bali</option>
+                    </select>
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn btn-primary" id="btn-start">
+                    🚀 Mulai Scraping
+                </button>
+            </form>
+        </section>
+
+        <!-- PROGRESS -->
+        <section class="progress-section" id="progress-section" style="display:none;">
+            <div class="progress-header">
+                <h2>⏳ Scraping Berjalan...</h2>
+                <div class="spinner"></div>
+            </div>
+
+            <div class="progress-log" id="progress-log"></div>
+
+            <!-- Action button (for CAPTCHA/confirmation) -->
+            <div id="action-area" style="display:none;">
+                <div class="alert alert-warning" id="action-message"></div>
+                <button class="btn btn-confirm" id="btn-confirm" onclick="confirmAction()">
+                    ✓ Konfirmasi (Sudah Selesai)
+                </button>
+            </div>
+        </section>
+
+        <!-- RESULT -->
+        <section class="result-section" id="result-section" style="display:none;">
+            <div class="result-card">
+                <h2>✅ Scraping Selesai!</h2>
+                <p id="result-message"></p>
+                <div style="display:flex; gap:0.75rem; flex-wrap:wrap; justify-content:center; margin-top:1rem;">
+                    <a id="download-link" href="#" class="btn btn-primary">📥 Download Excel</a>
+                    <a id="dashboard-link" href="/dashboard" class="btn btn-primary" style="background:#10b981;">📊 Lihat Dashboard</a>
+                    <a href="/results" class="btn btn-secondary">📁 Lihat Semua Hasil</a>
+                    <button onclick="resetForm()" class="btn btn-secondary">🔄 Scrape Lagi</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/js/scrape.js"></script>
+    <script>
+        const MARKETPLACE = "{{ marketplace }}";
+    </script>
+</body>
+</html>

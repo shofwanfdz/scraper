@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hasil Scraping</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">← Kembali</a>
+            <h1>📁 Hasil Scraping</h1>
+        </header>
+
+        <section id="results-list">
+            <p>Loading...</p>
+        </section>
+    </div>
+
+    <script>
+        async function loadResults() {
+            const res = await fetch('/api/results');
+            const data = await res.json();
+            const container = document.getElementById('results-list');
+
+            if (data.files.length === 0) {
+                container.innerHTML = '<p class="empty">Belum ada hasil scraping.</p>';
+                return;
+            }
+
+            let html = '<table class="results-table"><thead><tr><th>File</th><th>Marketplace</th><th>Size</th><th>Tanggal</th><th>Aksi</th></tr></thead><tbody>';
+            data.files.forEach(f => {
+                html += `<tr>
+                    <td>${f.name}</td>
+                    <td><span class="badge badge-${f.marketplace}">${f.marketplace}</span></td>
+                    <td>${f.size_kb} KB</td>
+                    <td>${f.date}</td>
+                    <td><a href="/api/download/${f.marketplace}/${f.name}" class="btn btn-sm">📥 Download</a></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+        loadResults();
+    </script>
+</body>
+</html>

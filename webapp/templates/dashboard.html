@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Analytics</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        .dashboard-container { max-width: 1500px; margin: 0 auto; padding: 1rem; }
+        .tabs { display: flex; gap: 0; border-bottom: 2px solid #334155; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .tab-btn { padding: 0.75rem 1.25rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 0.85rem; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+        .tab-btn:hover { color: #e2e8f0; background: #1e293b; }
+        .tab-btn.active { color: #60a5fa; border-bottom-color: #60a5fa; background: #1e293b; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .chart-card { background: #1e293b; border-radius: 12px; padding: 1.5rem; }
+        .chart-card h3 { margin-bottom: 1rem; color: #94a3b8; font-size: 0.9rem; font-weight: 600; }
+        .full-width { grid-column: 1 / -1; }
+        .metrics-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .metric-card { background: #1e293b; border-radius: 8px; padding: 1rem; text-align: center; }
+        .metric-card .value { font-size: 1.4rem; font-weight: 700; color: #60a5fa; }
+        .metric-card .label { font-size: 0.7rem; color: #64748b; margin-top: 0.25rem; text-transform: uppercase; }
+        .filter-bar { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+        .filter-bar .filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
+        .filter-bar label { color: #94a3b8; font-size: 0.75rem; font-weight: 500; }
+        .filter-bar select, .filter-bar input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; min-width: 120px; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+        .data-table th { background: #334155; padding: 0.6rem 0.5rem; text-align: left; color: #94a3b8; font-weight: 600; position: sticky; top: 0; }
+        .data-table td { padding: 0.5rem; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+        .data-table tr:hover { background: #334155; }
+        .data-table-wrap { max-height: 400px; overflow-y: auto; border-radius: 8px; }
+        .completeness-bar { height: 6px; background: #334155; border-radius: 3px; overflow: hidden; margin-top: 0.25rem; }
+        .completeness-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.9); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .loading-spinner { width: 40px; height: 40px; border: 3px solid #334155; border-top-color: #60a5fa; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .metrics-row { grid-template-columns: repeat(3, 1fr); } .tab-btn { padding: 0.5rem 0.75rem; font-size: 0.75rem; } }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+            <div>
+                <a href="/" style="color:#60a5fa; text-decoration:none; font-size:0.85rem;">&larr; Kembali</a>
+                <h1 style="margin:0.25rem 0 0; font-size:1.5rem;" id="page-title">&#128202; Dashboard Analytics</h1>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button onclick="exportCSV()" style="background:#10b981; border:none; color:white; padding:0.5rem 1rem; border-radius:6px; cursor:pointer; font-size:0.8rem;">&#128229; Export CSV</button>
+            </div>
+        </header>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>File Data</label>
+                <select id="file-select" onchange="loadData()"></select>
+            </div>
+            <div class="filter-group">
+                <label>Brand</label>
+                <select id="filter-brand" onchange="applyFilters()"><option value="">Semua</option></select>
+            </div>
+            <div class="filter-group">
+                <label>Kota</label>
+                <select id="filter-kota" onchange="applyFilters()"><option value="">Semua</option></select>
+            </div>
+            <div class="filter-group">
+                <label>Seller</label>
+                <select id="filter-seller" onchange="applyFilters()"><option value="">Semua</option></select>
+            </div>
+            <div class="filter-group">
+                <label>Harga Min</label>
+                <input type="number" id="filter-min-price" placeholder="0" onchange="applyFilters()">
+            </div>
+            <div class="filter-group">
+                <label>Harga Max</label>
+                <input type="number" id="filter-max-price" placeholder="999999999" onchange="applyFilters()">
+            </div>
+            <div class="filter-group">
+                <label>Rating Min</label>
+                <input type="number" id="filter-min-rating" placeholder="0" step="0.5" min="0" max="5" onchange="applyFilters()">
+            </div>
+            <div class="filter-group" style="margin-left:auto;">
+                <label>&nbsp;</label>
+                <span id="filter-count" style="color:#94a3b8; font-size:0.8rem;">0 / 0 produk</span>
+            </div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="metrics-row">
+            <div class="metric-card"><div class="value" id="m-total">-</div><div class="label">Total Produk</div></div>
+            <div class="metric-card"><div class="value" id="m-avg-price">-</div><div class="label">Harga Rata-rata</div></div>
+            <div class="metric-card"><div class="value" id="m-min-price">-</div><div class="label">Harga Terendah</div></div>
+            <div class="metric-card"><div class="value" id="m-max-price">-</div><div class="label">Harga Tertinggi</div></div>
+            <div class="metric-card"><div class="value" id="m-avg-rating">-</div><div class="label">Avg Rating</div></div>
+            <div class="metric-card"><div class="value" id="m-total-sold">-</div><div class="label">Total Terjual</div></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-harga', this)">&#128202; Harga</button>
+            <button class="tab-btn" onclick="switchTab('tab-seller', this)">&#127978; Seller</button>
+            <button class="tab-btn" onclick="switchTab('tab-lokasi', this)">&#128205; Lokasi</button>
+            <button class="tab-btn" onclick="switchTab('tab-penjualan', this)">&#128200; Penjualan</button>
+            <button class="tab-btn" onclick="switchTab('tab-diskon', this)">&#127991; Diskon</button>
+            <button class="tab-btn" onclick="switchTab('tab-brand', this)">&#128278; Brand</button>
+            <button class="tab-btn" onclick="switchTab('tab-bestvalue', this)">&#128142; Best Value</button>
+            <button class="tab-btn" onclick="switchTab('tab-data', this)">&#128203; Data</button>
+        </div>
+
+        <!-- TAB 1: HARGA -->
+        <div class="tab-content active" id="tab-harga">
+            <div class="grid-2">
+                <div class="chart-card"><h3>Distribusi Harga</h3><div id="chart-price-dist"></div></div>
+                <div class="chart-card"><h3>Segmentasi Harga</h3><div id="chart-price-segment"></div></div>
+            </div>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Top 10 Termurah</h3><div class="data-table-wrap" id="table-cheapest"></div></div>
+                <div class="chart-card"><h3>Top 10 Termahal</h3><div class="data-table-wrap" id="table-expensive"></div></div>
+            </div>
+            <div class="chart-card"><h3>Harga Rata-rata per Lokasi</h3><div id="chart-price-by-city"></div></div>
+        </div>
+
+        <!-- TAB 2: SELLER -->
+        <div class="tab-content" id="tab-seller">
+            <div class="grid-2">
+                <div class="chart-card"><h3>Top 10 Seller (Jumlah Produk)</h3><div id="chart-top-sellers"></div></div>
+                <div class="chart-card"><h3>Distribusi Tipe Seller</h3><div id="chart-seller-type"></div></div>
+            </div>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Rata-rata Rating per Seller</h3><div id="chart-seller-rating"></div></div>
+                <div class="chart-card"><h3>Seller Total Penjualan Tertinggi</h3><div id="chart-seller-sales"></div></div>
+            </div>
+        </div>
+
+        <!-- TAB 3: LOKASI -->
+        <div class="tab-content" id="tab-lokasi">
+            <div class="grid-2">
+                <div class="chart-card"><h3>Distribusi Produk per Kota</h3><div id="chart-city-products"></div></div>
+                <div class="chart-card"><h3>Seller Unik per Kota</h3><div id="chart-city-sellers"></div></div>
+            </div>
+            <div class="chart-card"><h3>Detail Harga per Kota</h3><div class="data-table-wrap" id="table-city-detail"></div></div>
+        </div>
+
+        <!-- TAB 4: PENJUALAN -->
+        <div class="tab-content" id="tab-penjualan">
+            <div class="grid-2">
+                <div class="chart-card"><h3>Top 10 Produk Terlaris</h3><div id="chart-top-sold"></div></div>
+                <div class="chart-card"><h3>Distribusi Rating</h3><div id="chart-rating-dist"></div></div>
+            </div>
+            <div class="chart-card"><h3>Korelasi Harga vs Terjual</h3><div id="chart-price-vs-sold"></div></div>
+        </div>
+
+        <!-- TAB 5: DISKON -->
+        <div class="tab-content" id="tab-diskon">
+            <div class="grid-2">
+                <div class="chart-card"><h3>Proporsi Produk Diskon</h3><div id="chart-diskon-ratio"></div></div>
+                <div class="chart-card"><h3>Rata-rata Diskon per Seller</h3><div id="chart-diskon-seller"></div></div>
+            </div>
+            <div class="chart-card"><h3>Top 10 Diskon Terbesar</h3><div class="data-table-wrap" id="table-top-diskon"></div></div>
+        </div>
+
+        <!-- TAB 6: BRAND -->
+        <div class="tab-content" id="tab-brand">
+            <div class="grid-2">
+                <div class="chart-card"><h3>Market Share per Brand</h3><div id="chart-brand-share"></div></div>
+                <div class="chart-card"><h3>Harga Rata-rata per Brand</h3><div id="chart-brand-price"></div></div>
+            </div>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Rating per Brand</h3><div id="chart-brand-rating"></div></div>
+                <div class="chart-card"><h3>Jumlah Produk per Brand</h3><div id="chart-brand-count"></div></div>
+            </div>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Detail Harga per Brand</h3><div class="data-table-wrap" id="table-brand-detail"></div></div>
+                <div class="chart-card"><h3>Seller Termurah per Brand</h3><div class="data-table-wrap" id="table-brand-cheapest"></div></div>
+            </div>
+        </div>
+
+        <!-- TAB 7: BEST VALUE -->
+        <div class="tab-content" id="tab-bestvalue">
+            <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:1rem;">Skor = (Rating x Terjual) / (Harga / 1 Juta) &mdash; Semakin tinggi semakin worth it</p>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Top 15 Best Value</h3><div id="chart-best-value"></div></div>
+                <div class="chart-card"><h3>Korelasi Diskon vs Rating</h3><div id="chart-diskon-vs-rating"></div></div>
+            </div>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Best Value per Brand</h3><div class="data-table-wrap" id="table-bv-brand"></div></div>
+                <div class="chart-card"><h3>Top 15 Detail</h3><div class="data-table-wrap" id="table-bv-detail"></div></div>
+            </div>
+        </div>
+
+        <!-- TAB 8: DATA -->
+        <div class="tab-content" id="tab-data">
+            <div class="grid-2">
+                <div class="chart-card"><h3>Kelengkapan Data</h3><div id="completeness-info"></div></div>
+                <div class="chart-card"><h3>Ringkasan</h3><div id="summary-info"></div></div>
+            </div>
+            <div class="chart-card">
+                <h3>Data Lengkap (<span id="table-count">0</span> produk)</h3>
+                <div class="data-table-wrap" style="max-height:600px;" id="table-full-data"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-overlay" id="loading" style="display:none;">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <script>
+    let allData = [];
+    let filteredData = [];
+    let currentMarketplace = '';
+
+    const darkLayout = {
+        paper_bgcolor: '#1e293b', plot_bgcolor: '#1e293b',
+        font: { color: '#e2e8f0', size: 11 },
+        margin: { t: 30, b: 50, l: 60, r: 20 },
+        height: 350
+    };
+    const colors = ['#3b82f6','#f97316','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16','#ef4444','#14b8a6'];
+
+    // ============ INIT ============
+    async function init() {
+        showLoading(true);
+        const res = await fetch('/api/results');
+        const data = await res.json();
+        const select = document.getElementById('file-select');
+        select.innerHTML = '';
+        data.files.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f.marketplace + '/' + f.name;
+            opt.textContent = '[' + f.marketplace.toUpperCase() + '] ' + f.name + ' (' + f.size_kb + ' KB)';
+            select.appendChild(opt);
+        });
+        const urlParams = new URLSearchParams(window.location.search);
+        const preselect = urlParams.get('file');
+        if (preselect && select.querySelector('option[value="' + preselect + '"]')) {
+            select.value = preselect;
+        }
+        if (data.files.length > 0) await loadData();
+        else showLoading(false);
+    }
+
+    async function loadData() {
+        const file = document.getElementById('file-select').value;
+        if (!file) return;
+        showLoading(true);
+        const parts = file.split('/');
+        const marketplace = parts[0];
+        const filename = parts.slice(1).join('/');
+        currentMarketplace = marketplace;
+        try {
+            const res = await fetch('/api/dashboard-data/' + marketplace + '/' + filename);
+            const data = await res.json();
+            if (data.error) { alert('Error: ' + data.error); showLoading(false); return; }
+            allData = data.products;
+            document.getElementById('page-title').textContent = '\u{1F4CA} ' + marketplace.charAt(0).toUpperCase() + marketplace.slice(1) + ' Dashboard Analytics';
+            populateFilters();
+            applyFilters();
+        } catch(e) { alert('Gagal memuat data: ' + e.message); }
+        showLoading(false);
+    }
+
+    // ============ FILTERS ============
+    function populateFilters() {
+        const brands = [...new Set(allData.map(p => p.brand).filter(Boolean))].sort();
+        const cities = [...new Set(allData.map(p => p.kota).filter(Boolean))].sort();
+        const sellers = [...new Set(allData.map(p => p.penjual).filter(Boolean))].sort();
+        setOpts('filter-brand', brands);
+        setOpts('filter-kota', cities);
+        setOpts('filter-seller', sellers);
+    }
+    function setOpts(id, items) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option value="">Semua</option>' + items.map(i => '<option value="'+escH(i)+'">'+escH(i)+'</option>').join('');
+    }
+    function applyFilters() {
+        const brand = document.getElementById('filter-brand').value;
+        const kota = document.getElementById('filter-kota').value;
+        const seller = document.getElementById('filter-seller').value;
+        const minP = parseFloat(document.getElementById('filter-min-price').value) || 0;
+        const maxP = parseFloat(document.getElementById('filter-max-price').value) || 999999999;
+        const minR = parseFloat(document.getElementById('filter-min-rating').value) || 0;
+        filteredData = allData.filter(p => {
+            if (brand && p.brand !== brand) return false;
+            if (kota && p.kota !== kota) return false;
+            if (seller && p.penjual !== seller) return false;
+            if (p.harga_angka != null && (p.harga_angka < minP || p.harga_angka > maxP)) return false;
+            if (minR > 0 && (p.rating == null || p.rating < minR)) return false;
+            return true;
+        });
+        document.getElementById('filter-count').textContent = filteredData.length + ' / ' + allData.length + ' produk';
+        updateAll();
+    }
+
+    function updateAll() {
+        updateMetrics();
+        updateTabHarga();
+        updateTabSeller();
+        updateTabLokasi();
+        updateTabPenjualan();
+        updateTabDiskon();
+        updateTabBrand();
+        updateTabBestValue();
+        updateTabData();
+    }
+
+    // ============ METRICS ============
+    function updateMetrics() {
+        const d = filteredData;
+        const prices = d.map(p => p.harga_angka).filter(v => v != null);
+        const ratings = d.map(p => p.rating).filter(v => v != null);
+        const sold = d.map(p => p.terjual).filter(v => v != null);
+        document.getElementById('m-total').textContent = d.length;
+        document.getElementById('m-avg-price').textContent = prices.length ? 'Rp' + Math.round(avg(prices)).toLocaleString('id-ID') : '-';
+        document.getElementById('m-min-price').textContent = prices.length ? 'Rp' + Math.min(...prices).toLocaleString('id-ID') : '-';
+        document.getElementById('m-max-price').textContent = prices.length ? 'Rp' + Math.max(...prices).toLocaleString('id-ID') : '-';
+        document.getElementById('m-avg-rating').textContent = ratings.length ? avg(ratings).toFixed(2) : '-';
+        document.getElementById('m-total-sold').textContent = sold.length ? sum(sold).toLocaleString('id-ID') : '-';
+    }
+
+    // ============ TAB 1: HARGA ============
+    function updateTabHarga() {
+        const d = filteredData;
+        const prices = d.map(p => p.harga_angka).filter(v => v != null);
+
+        Plotly.newPlot('chart-price-dist', [{
+            x: prices, type: 'histogram', marker: { color: '#1F4E79' }, nbinsx: 15
+        }], {...darkLayout, xaxis:{title:'Harga (Rp)'}, yaxis:{title:'Jumlah'}}, {responsive:true});
+
+        const segs = {'Budget (<5jt)':0, 'Mid (5-10jt)':0, 'High (10-20jt)':0, 'Premium (>20jt)':0};
+        prices.forEach(p => { if(p<5e6) segs['Budget (<5jt)']++; else if(p<10e6) segs['Mid (5-10jt)']++; else if(p<20e6) segs['High (10-20jt)']++; else segs['Premium (>20jt)']++; });
+        const segL = Object.keys(segs).filter(k=>segs[k]>0);
+        Plotly.newPlot('chart-price-segment', [{
+            labels: segL, values: segL.map(k=>segs[k]), type:'pie',
+            marker:{colors:['#5B9BD5','#ED7D31','#A5A5A5','#FFC000']},
+            textposition:'inside', textinfo:'percent+label'
+        }], {...darkLayout, showlegend:true}, {responsive:true});
+
+        const cheapest = [...d].filter(p=>p.harga_angka!=null).sort((a,b)=>a.harga_angka-b.harga_angka).slice(0,10);
+        document.getElementById('table-cheapest').innerHTML = mkTbl(cheapest, ['nama_produk','harga','brand','penjual'], ['Produk','Harga','Brand','Seller']);
+
+        const expensive = [...d].filter(p=>p.harga_angka!=null).sort((a,b)=>b.harga_angka-a.harga_angka).slice(0,10);
+        document.getElementById('table-expensive').innerHTML = mkTbl(expensive, ['nama_produk','harga','brand','penjual'], ['Produk','Harga','Brand','Seller']);
+
+        const cityP = grpBy(d.filter(p=>p.kota&&p.harga_angka!=null), 'kota');
+        const cityAvg = Object.entries(cityP).map(([k,items])=>({k, v:avg(items.map(i=>i.harga_angka))})).sort((a,b)=>b.v-a.v).slice(0,12);
+        Plotly.newPlot('chart-price-by-city', [{
+            x:cityAvg.map(c=>c.v), y:cityAvg.map(c=>c.k), type:'bar', orientation:'h', marker:{color:'#2E75B6'}
+        }], {...darkLayout, height:380, yaxis:{autorange:'reversed'}, xaxis:{title:'Harga Rata-rata (Rp)'}}, {responsive:true});
+    }
+
+    // ============ TAB 2: SELLER ============
+    function updateTabSeller() {
+        const d = filteredData;
+        const sc = cntBy(d,'penjual'); const topS = topN(sc,10);
+        Plotly.newPlot('chart-top-sellers', [{
+            x:topS.map(s=>s[1]), y:topS.map(s=>s[0]), type:'bar', orientation:'h', marker:{color:'#2E75B6'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Jumlah Produk'}}, {responsive:true});
+
+        const flagship = d.filter(p=>p.penjual&&/flagship|official|blibli/i.test(p.penjual)).length;
+        const individu = d.filter(p=>p.penjual==='Seller Individu').length;
+        const regular = d.length - flagship - individu;
+        const tL=[],tV=[]; if(flagship>0){tL.push('Flagship/Official');tV.push(flagship);} if(regular>0){tL.push('Regular');tV.push(regular);} if(individu>0){tL.push('Individu');tV.push(individu);}
+        Plotly.newPlot('chart-seller-type', [{
+            labels:tL, values:tV, type:'pie', marker:{colors:['#4472C4','#ED7D31','#A5A5A5']},
+            textposition:'inside', textinfo:'percent+label+value'
+        }], {...darkLayout, height:400, showlegend:true}, {responsive:true});
+
+        const sRat = grpBy(d.filter(p=>p.penjual&&p.rating!=null),'penjual');
+        const sAvgR = Object.entries(sRat).map(([k,items])=>({k, v:avg(items.map(i=>i.rating))})).sort((a,b)=>b.v-a.v).slice(0,10);
+        Plotly.newPlot('chart-seller-rating', [{
+            x:sAvgR.map(s=>s.v), y:sAvgR.map(s=>s.k), type:'bar', orientation:'h', marker:{color:'#FFC000'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Avg Rating'}}, {responsive:true});
+
+        const sSales = grpBy(d.filter(p=>p.penjual&&p.terjual!=null),'penjual');
+        const sTotS = Object.entries(sSales).map(([k,items])=>({k, v:sum(items.map(i=>i.terjual))})).sort((a,b)=>b.v-a.v).slice(0,10);
+        Plotly.newPlot('chart-seller-sales', [{
+            x:sTotS.map(s=>s.v), y:sTotS.map(s=>s.k), type:'bar', orientation:'h', marker:{color:'#70AD47'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Total Terjual'}}, {responsive:true});
+    }
+
+    // ============ TAB 3: LOKASI ============
+    function updateTabLokasi() {
+        const d = filteredData;
+        const cc = cntBy(d,'kota'); const topC = topN(cc,10);
+        Plotly.newPlot('chart-city-products', [{
+            x:topC.map(c=>c[1]), y:topC.map(c=>c[0]), type:'bar', orientation:'h', marker:{color:'#70AD47'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Jumlah Produk'}}, {responsive:true});
+
+        const csMap = {};
+        d.filter(p=>p.kota&&p.penjual).forEach(p=>{if(!csMap[p.kota])csMap[p.kota]=new Set();csMap[p.kota].add(p.penjual);});
+        const cs = Object.entries(csMap).map(([k,s])=>[k,s.size]).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        Plotly.newPlot('chart-city-sellers', [{
+            x:cs.map(c=>c[1]), y:cs.map(c=>c[0]), type:'bar', orientation:'h', marker:{color:'#9B57A0'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Jumlah Seller'}}, {responsive:true});
+
+        const cGrp = grpBy(d.filter(p=>p.kota&&p.harga_angka!=null),'kota');
+        const cDet = Object.entries(cGrp).map(([k,items])=>{
+            const pr=items.map(i=>i.harga_angka);
+            return {Kota:k, Produk:items.length, 'Rata-rata':'Rp'+Math.round(avg(pr)).toLocaleString('id-ID'), Termurah:'Rp'+Math.min(...pr).toLocaleString('id-ID'), Termahal:'Rp'+Math.max(...pr).toLocaleString('id-ID')};
+        }).sort((a,b)=>b.Produk-a.Produk);
+        document.getElementById('table-city-detail').innerHTML = mkTblObj(cDet, ['Kota','Produk','Rata-rata','Termurah','Termahal']);
+    }
+
+    // ============ TAB 4: PENJUALAN ============
+    function updateTabPenjualan() {
+        const d = filteredData;
+        const topSold = [...d].filter(p=>p.terjual!=null).sort((a,b)=>b.terjual-a.terjual).slice(0,10);
+        Plotly.newPlot('chart-top-sold', [{
+            x:topSold.map(p=>p.terjual), y:topSold.map(p=>trunc(p.nama_produk,35)),
+            type:'bar', orientation:'h', marker:{color:'#4472C4'}
+        }], {...darkLayout, height:450, yaxis:{autorange:'reversed'}, xaxis:{title:'Terjual'}}, {responsive:true});
+
+        const rc = cntBy(d.filter(p=>p.rating!=null),'rating');
+        const re = Object.entries(rc).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0]));
+        Plotly.newPlot('chart-rating-dist', [{
+            labels:re.map(e=>e[0]), values:re.map(e=>e[1]), type:'pie', marker:{colors:colors},
+            textposition:'inside', textinfo:'percent+label+value'
+        }], {...darkLayout, height:450, showlegend:true}, {responsive:true});
+
+        const scD = d.filter(p=>p.harga_angka!=null&&p.terjual!=null);
+        const brands = [...new Set(scD.map(p=>p.brand))].slice(0,8);
+        const traces = brands.map((brand,i)=>{
+            const items = scD.filter(p=>p.brand===brand);
+            return {x:items.map(p=>p.harga_angka), y:items.map(p=>p.terjual), mode:'markers', type:'scatter', name:brand,
+                marker:{color:colors[i%colors.length], size:8}, text:items.map(p=>trunc(p.nama_produk,30)),
+                hovertemplate:'%{text}<br>Harga: Rp%{x:,.0f}<br>Terjual: %{y}<extra></extra>'};
+        });
+        Plotly.newPlot('chart-price-vs-sold', traces, {...darkLayout, height:400, xaxis:{title:'Harga (Rp)'}, yaxis:{title:'Terjual'}, showlegend:true, legend:{font:{size:10}}}, {responsive:true});
+    }
+
+    // ============ TAB 5: DISKON ============
+    function updateTabDiskon() {
+        const d = filteredData;
+        const withD = d.filter(p=>p.diskon_persen!=null&&p.diskon_persen>0);
+        const withoutD = d.length - withD.length;
+
+        Plotly.newPlot('chart-diskon-ratio', [{
+            labels:['Diskon','Tanpa Diskon'], values:[withD.length, withoutD], type:'pie',
+            marker:{colors:['#ED7D31','#A5A5A5']}, textposition:'inside', textinfo:'percent+label+value'
+        }], {...darkLayout, height:350, showlegend:true}, {responsive:true});
+
+        if (withD.length > 0) {
+            const sD = grpBy(withD,'penjual');
+            const sAvgD = Object.entries(sD).map(([k,items])=>({k, v:avg(items.map(i=>i.diskon_persen))})).sort((a,b)=>b.v-a.v).slice(0,10);
+            Plotly.newPlot('chart-diskon-seller', [{
+                x:sAvgD.map(s=>s.v), y:sAvgD.map(s=>s.k), type:'bar', orientation:'h', marker:{color:'#ED7D31'}
+            }], {...darkLayout, height:350, yaxis:{autorange:'reversed'}, xaxis:{title:'Avg Diskon %'}}, {responsive:true});
+        } else {
+            document.getElementById('chart-diskon-seller').innerHTML = '<p style="color:#64748b;text-align:center;padding:2rem;">Tidak ada data diskon</p>';
+        }
+
+        const topDisk = [...withD].sort((a,b)=>b.diskon_persen-a.diskon_persen).slice(0,10);
+        const dRows = topDisk.map(p=>({Produk:trunc(p.nama_produk,40), Harga:p.harga||'-', 'Harga Asli':p.harga_sebelum_diskon||'-', Diskon:(p.diskon_persen||0).toFixed(1)+'%', Seller:p.penjual||'-'}));
+        document.getElementById('table-top-diskon').innerHTML = mkTblObj(dRows, ['Produk','Harga','Harga Asli','Diskon','Seller']);
+    }
+
+    // ============ TAB 6: BRAND ============
+    function updateTabBrand() {
+        const d = filteredData;
+        const bc = cntBy(d,'brand'); const topB = topN(bc,10);
+
+        Plotly.newPlot('chart-brand-share', [{
+            labels:topB.map(b=>b[0]), values:topB.map(b=>b[1]), type:'pie', hole:0.4,
+            marker:{colors:colors}, textposition:'inside', textinfo:'percent+label'
+        }], {...darkLayout, height:400, showlegend:true, legend:{font:{size:10}}}, {responsive:true});
+
+        const bP = grpBy(d.filter(p=>p.brand&&p.harga_angka!=null),'brand');
+        const bAvgP = Object.entries(bP).map(([k,items])=>({k, v:avg(items.map(i=>i.harga_angka))})).sort((a,b)=>b.v-a.v).slice(0,10);
+        Plotly.newPlot('chart-brand-price', [{
+            x:bAvgP.map(b=>b.v), y:bAvgP.map(b=>b.k), type:'bar', orientation:'h', marker:{color:'#ED7D31'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Rata-rata Harga (Rp)'}}, {responsive:true});
+
+        const bR = grpBy(d.filter(p=>p.brand&&p.rating!=null),'brand');
+        const bAvgR = Object.entries(bR).map(([k,items])=>({k, v:avg(items.map(i=>i.rating))})).sort((a,b)=>b.v-a.v).slice(0,10);
+        Plotly.newPlot('chart-brand-rating', [{
+            x:bAvgR.map(b=>b.v), y:bAvgR.map(b=>b.k), type:'bar', orientation:'h', marker:{color:'#FFC000'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Avg Rating'}}, {responsive:true});
+
+        Plotly.newPlot('chart-brand-count', [{
+            x:topB.map(b=>b[1]), y:topB.map(b=>b[0]), type:'bar', orientation:'h', marker:{color:'#4472C4'}
+        }], {...darkLayout, height:400, yaxis:{autorange:'reversed'}, xaxis:{title:'Jumlah Produk'}}, {responsive:true});
+
+        const bDet = Object.entries(bP).map(([k,items])=>{
+            const pr=items.map(i=>i.harga_angka);
+            return {Brand:k, Produk:items.length, 'Rata-rata':'Rp'+Math.round(avg(pr)).toLocaleString('id-ID'), Termurah:'Rp'+Math.min(...pr).toLocaleString('id-ID'), Termahal:'Rp'+Math.max(...pr).toLocaleString('id-ID')};
+        }).sort((a,b)=>b.Produk-a.Produk);
+        document.getElementById('table-brand-detail').innerHTML = mkTblObj(bDet, ['Brand','Produk','Rata-rata','Termurah','Termahal']);
+
+        const bCheap = Object.entries(bP).map(([brand,items])=>{
+            const c = items.reduce((min,p)=>p.harga_angka<min.harga_angka?p:min, items[0]);
+            return {Brand:brand, Produk:trunc(c.nama_produk,40), Harga:c.harga||'-', Seller:c.penjual||'-'};
+        }).sort((a,b)=>a.Brand.localeCompare(b.Brand));
+        document.getElementById('table-brand-cheapest').innerHTML = mkTblObj(bCheap, ['Brand','Produk','Harga','Seller']);
+    }
+
+    // ============ TAB 7: BEST VALUE ============
+    function updateTabBestValue() {
+        const d = filteredData;
+        const withScore = d.filter(p=>p.value_score!=null&&p.value_score>0).sort((a,b)=>b.value_score-a.value_score).slice(0,15);
+
+        Plotly.newPlot('chart-best-value', [{
+            x:withScore.map(p=>p.value_score), y:withScore.map(p=>trunc(p.nama_produk,30)),
+            type:'bar', orientation:'h', marker:{color:'#70AD47'}
+        }], {...darkLayout, height:500, yaxis:{autorange:'reversed'}, xaxis:{title:'Value Score'}}, {responsive:true});
+
+        const dr = d.filter(p=>p.diskon_persen!=null&&p.rating!=null);
+        if (dr.length > 0) {
+            const drB = [...new Set(dr.map(p=>p.brand))].slice(0,8);
+            const drT = drB.map((brand,i)=>{
+                const items = dr.filter(p=>p.brand===brand);
+                return {x:items.map(p=>p.diskon_persen), y:items.map(p=>p.rating), mode:'markers', type:'scatter', name:brand,
+                    marker:{color:colors[i%colors.length], size:8}, text:items.map(p=>trunc(p.nama_produk,25)),
+                    hovertemplate:'%{text}<br>Diskon: %{x:.1f}%<br>Rating: %{y}<extra></extra>'};
+            });
+            Plotly.newPlot('chart-diskon-vs-rating', drT, {...darkLayout, height:500, xaxis:{title:'Diskon (%)'}, yaxis:{title:'Rating'}, showlegend:true, legend:{font:{size:10}}}, {responsive:true});
+        } else {
+            document.getElementById('chart-diskon-vs-rating').innerHTML = '<p style="color:#64748b;text-align:center;padding:2rem;">Tidak ada data diskon</p>';
+        }
+
+        const bGrp = grpBy(d.filter(p=>p.value_score!=null&&p.value_score>0),'brand');
+        const bvB = Object.entries(bGrp).map(([brand,items])=>{
+            const best = items.reduce((max,p)=>p.value_score>max.value_score?p:max, items[0]);
+            return {Brand:brand, Produk:trunc(best.nama_produk,35), Harga:best.harga||'-', Rating:(best.rating||0).toFixed(1), Terjual:best.terjual||0, Score:best.value_score.toFixed(1)};
+        }).sort((a,b)=>parseFloat(b.Score)-parseFloat(a.Score));
+        document.getElementById('table-bv-brand').innerHTML = mkTblObj(bvB, ['Brand','Produk','Harga','Rating','Terjual','Score']);
+
+        const bvDet = withScore.map(p=>({Produk:trunc(p.nama_produk,35), Brand:p.brand||'-', Harga:p.harga||'-', Rating:(p.rating||0).toFixed(1), Terjual:p.terjual||0, Score:p.value_score.toFixed(1)}));
+        document.getElementById('table-bv-detail').innerHTML = mkTblObj(bvDet, ['Produk','Brand','Harga','Rating','Terjual','Score']);
+    }
+
+    // ============ TAB 8: DATA ============
+    function updateTabData() {
+        const d = filteredData;
+        document.getElementById('table-count').textContent = d.length;
+
+        const fields = ['nama_produk','harga','penjual','kota','terjual','rating'];
+        let compH = '';
+        fields.forEach(field => {
+            const filled = d.filter(p=>p[field]!=null&&p[field]!=='').length;
+            const pct = d.length>0 ? Math.round(filled/d.length*100) : 0;
+            const color = pct>=90?'#10b981':pct>=60?'#f59e0b':'#ef4444';
+            compH += '<div style="margin-bottom:0.75rem;"><div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span style="color:#e2e8f0;font-weight:500;">'+field+'</span><span style="color:'+color+';">'+filled+'/'+d.length+' ('+pct+'%)</span></div><div class="completeness-bar"><div class="completeness-fill" style="width:'+pct+'%;background:'+color+';"></div></div></div>';
+        });
+        document.getElementById('completeness-info').innerHTML = compH;
+
+        const prices = d.map(p=>p.harga_angka).filter(v=>v!=null);
+        const ratings = d.map(p=>p.rating).filter(v=>v!=null);
+        const sellers = new Set(d.map(p=>p.penjual).filter(Boolean));
+        const brands = new Set(d.map(p=>p.brand).filter(Boolean));
+        const cities = new Set(d.map(p=>p.kota).filter(Boolean));
+        document.getElementById('summary-info').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.8rem;"><div><span style="color:#94a3b8;">Total Produk:</span> <strong style="color:#e2e8f0;">'+d.length+'</strong></div><div><span style="color:#94a3b8;">Unique Seller:</span> <strong style="color:#e2e8f0;">'+sellers.size+'</strong></div><div><span style="color:#94a3b8;">Unique Brand:</span> <strong style="color:#e2e8f0;">'+brands.size+'</strong></div><div><span style="color:#94a3b8;">Unique Kota:</span> <strong style="color:#e2e8f0;">'+cities.size+'</strong></div><div><span style="color:#94a3b8;">Median Harga:</span> <strong style="color:#e2e8f0;">Rp'+(prices.length?Math.round(median(prices)).toLocaleString('id-ID'):'-')+'</strong></div><div><span style="color:#94a3b8;">Median Rating:</span> <strong style="color:#e2e8f0;">'+(ratings.length?median(ratings).toFixed(1):'-')+'</strong></div><div><span style="color:#94a3b8;">Marketplace:</span> <strong style="color:#60a5fa;">'+currentMarketplace.toUpperCase()+'</strong></div><div><span style="color:#94a3b8;">File:</span> <strong style="color:#e2e8f0;">'+document.getElementById('file-select').value.split('/').pop()+'</strong></div></div>';
+
+        const rows = d.map(p=>({Produk:trunc(p.nama_produk,50), Brand:p.brand||'-', Harga:p.harga||'-', Seller:p.penjual||'-', Kota:p.kota||'-', Terjual:p.terjual||'-', Rating:p.rating||'-'}));
+        document.getElementById('table-full-data').innerHTML = mkTblObj(rows, ['Produk','Brand','Harga','Seller','Kota','Terjual','Rating']);
+    }
+
+    // ============ TAB SWITCH ============
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    // ============ EXPORT CSV ============
+    function exportCSV() {
+        if (!filteredData.length) { alert('Tidak ada data!'); return; }
+        const cols = ['nama_produk','brand','harga','harga_angka','penjual','kota','terjual','rating','diskon_persen','value_score'];
+        const hdr = cols.join(',');
+        const rows = filteredData.map(p=>cols.map(c=>{let v=p[c]!=null?String(p[c]):'';if(v.includes(',')||v.includes('"'))v='"'+v.replace(/"/g,'""')+'"';return v;}).join(','));
+        const csv = hdr+'\n'+rows.join('\n');
+        const blob = new Blob([csv],{type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href=url; a.download=currentMarketplace+'_filtered.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // ============ UTILITIES ============
+    function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0;}
+    function sum(a){return a.reduce((x,y)=>x+y,0);}
+    function median(a){const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+    function trunc(s,l){return s&&s.length>l?s.substring(0,l)+'...':s||'-';}
+    function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function grpBy(arr,key){const m={};arr.forEach(i=>{const k=i[key];if(k!=null){if(!m[k])m[k]=[];m[k].push(i);}});return m;}
+    function cntBy(arr,key){const m={};arr.forEach(i=>{const k=i[key];if(k!=null)m[k]=(m[k]||0)+1;});return m;}
+    function topN(m,n){return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n);}
+
+    function mkTbl(data, fields, headers) {
+        let h='<table class="data-table"><thead><tr>'; headers.forEach(x=>h+='<th>'+x+'</th>'); h+='</tr></thead><tbody>';
+        data.forEach(row=>{h+='<tr>';fields.forEach(f=>{let v=row[f]!=null?row[f]:'-';if(f==='nama_produk')v=trunc(String(v),45);h+='<td>'+escH(String(v))+'</td>';});h+='</tr>';});
+        return h+'</tbody></table>';
+    }
+    function mkTblObj(data, headers) {
+        let h='<table class="data-table"><thead><tr>'; headers.forEach(x=>h+='<th>'+x+'</th>'); h+='</tr></thead><tbody>';
+        data.forEach(row=>{h+='<tr>';headers.forEach(x=>{let v=row[x]!=null?row[x]:'-';h+='<td>'+escH(String(v))+'</td>';});h+='</tr>';});
+        return h+'</tbody></table>';
+    }
+    function showLoading(s){document.getElementById('loading').style.display=s?'flex':'none';}
+
+    // START - ensure Plotly is loaded before init
+    function waitForPlotly() {
+        if (typeof Plotly !== 'undefined') { init(); }
+        else { setTimeout(waitForPlotly, 100); }
+    }
+    document.addEventListener('DOMContentLoaded', waitForPlotly);
+    </script>
+</body>
+</html>

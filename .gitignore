@@ -1,0 +1,55 @@
+# Test files
+tests/
+
+# Claude Code
+.claude/
+
+# Chrome/Selenium profiles (contains cookies & session data)
+scrapers/shopee_profile/
+
+# Scraping results
+hasil/
+downloaded_files/
+
+# Temp files
+*.tmp
+~$*.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Logs
+logs/
+*.log
+
+# Exports
+exports/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Proxy lists
+proxies.txt
+proxy_list.txt

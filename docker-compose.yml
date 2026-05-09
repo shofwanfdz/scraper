@@ -1,0 +1,83 @@
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: scraping_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: fadiltaz17
+      MYSQL_DATABASE: scraping_db
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./setup_database.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Scraping API Server
+  api:
+    build: .
+    container_name: scraping_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=scraping_db
+      - DB_USER=root
+      - DB_PASSWORD=fadiltaz17
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - APP_DEBUG=true
+    volumes:
+      - ./exports:/app/exports
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python main.py server
+
+  # Scraping Worker (for running scrape jobs)
+  worker:
+    build: .
+    container_name: scraping_worker
+    restart: unless-stopped
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=scraping_db
+      - DB_USER=root
+      - DB_PASSWORD=fadiltaz17
+    volumes:
+      - ./exports:/app/exports
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    # Worker stays idle, jobs triggered via API or CLI
+    command: tail -f /dev/null
+
+  # phpMyAdmin (optional - for easy DB management)
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: scraping_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: fadiltaz17
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
