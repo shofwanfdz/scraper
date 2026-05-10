@@ -106,6 +106,7 @@
             <button class="tab-btn" onclick="switchTab('tab-diskon', this)">&#127991; Diskon</button>
             <button class="tab-btn" onclick="switchTab('tab-brand', this)">&#128278; Brand</button>
             <button class="tab-btn" onclick="switchTab('tab-bestvalue', this)">&#128142; Best Value</button>
+            <button class="tab-btn" onclick="switchTab('tab-rekomendasi', this)">&#128161; Rekomendasi</button>
             <button class="tab-btn" onclick="switchTab('tab-data', this)">&#128203; Data</button>
         </div>
 
@@ -187,6 +188,25 @@
             <div class="grid-2">
                 <div class="chart-card"><h3>Best Value per Brand</h3><div class="data-table-wrap" id="table-bv-brand"></div></div>
                 <div class="chart-card"><h3>Top 15 Detail</h3><div class="data-table-wrap" id="table-bv-detail"></div></div>
+            </div>
+        </div>
+
+        <!-- TAB 8: REKOMENDASI -->
+        <div class="tab-content" id="tab-rekomendasi">
+            <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:1rem;">
+                Skor Dinamis = Terjual 30% | Rating 15% | Harga 15% | Favorit 15% | Diskon 10% | Ulasan 10% | Stock 5%
+                &mdash; Semua dimensi dinormalisasi 0-100 terhadap data aktual
+            </p>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Top 20 Rekomendasi</h3><div id="chart-rec-top"></div></div>
+                <div class="chart-card"><h3>Engagement Tertinggi (Favorit + Ulasan)</h3><div id="chart-rec-engagement"></div></div>
+            </div>
+            <div class="chart-card full-width"><h3>Rekomendasi per Segmen Harga</h3>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:0.5rem;" id="rec-segment-container"></div>
+            </div>
+            <div class="grid-2">
+                <div class="chart-card"><h3>Detail Top 20 Rekomendasi</h3><div class="data-table-wrap" id="table-rec-detail"></div></div>
+                <div class="chart-card"><h3>Breakdown Skor (normalisasi 0-100)</h3><div class="data-table-wrap" id="table-rec-breakdown"></div></div>
             </div>
         </div>
 
@@ -304,6 +324,7 @@
         updateTabDiskon();
         updateTabBrand();
         updateTabBestValue();
+        updateTabRekomendasi();
         updateTabData();
     }
 
@@ -500,10 +521,11 @@
     // ============ TAB 7: BEST VALUE ============
     function updateTabBestValue() {
         const d = filteredData;
-        const withScore = d.filter(p=>p.value_score!=null&&p.value_score>0).sort((a,b)=>b.value_score-a.value_score).slice(0,15);
+        const withScore = d.filter(p=>p.rekomendasi_score>0).sort((a,b)=>b.rekomendasi_score-a.rekomendasi_score).slice(0,15);
 
         Plotly.newPlot('chart-best-value', [{
-            x:withScore.map(p=>p.value_score), y:withScore.map(p=>trunc(p.nama_produk,30)),
+            x:withScore.map(p=>p.rekomendasi_score),
+            y:withScore.map(p=>trunc(p.nama_produk,30)),
             type:'bar', orientation:'h', marker:{color:'#70AD47'}
         }], {...darkLayout, height:500, yaxis:{autorange:'reversed'}, xaxis:{title:'Value Score'}}, {responsive:true});
 
@@ -521,14 +543,14 @@
             document.getElementById('chart-diskon-vs-rating').innerHTML = '<p style="color:#64748b;text-align:center;padding:2rem;">Tidak ada data diskon</p>';
         }
 
-        const bGrp = grpBy(d.filter(p=>p.value_score!=null&&p.value_score>0),'brand');
+        const bGrp = grpBy(d.filter(p=>p.rekomendasi_score>0),'brand');
         const bvB = Object.entries(bGrp).map(([brand,items])=>{
-            const best = items.reduce((max,p)=>p.value_score>max.value_score?p:max, items[0]);
-            return {Brand:brand, Produk:trunc(best.nama_produk,35), Harga:best.harga||'-', Rating:(best.rating||0).toFixed(1), Terjual:best.terjual||0, Score:best.value_score.toFixed(1)};
+            const best = items.reduce((max,p)=>p.rekomendasi_score>max.rekomendasi_score?p:max, items[0]);
+            return {Brand:brand, Produk:trunc(best.nama_produk,35), Harga:best.harga||'-', Rating:(best.rating||0).toFixed(1), Terjual:best.terjual||0, Score:best.rekomendasi_score.toFixed(1)};
         }).sort((a,b)=>parseFloat(b.Score)-parseFloat(a.Score));
         document.getElementById('table-bv-brand').innerHTML = mkTblObj(bvB, ['Brand','Produk','Harga','Rating','Terjual','Score']);
 
-        const bvDet = withScore.map(p=>({Produk:trunc(p.nama_produk,35), Brand:p.brand||'-', Harga:p.harga||'-', Rating:(p.rating||0).toFixed(1), Terjual:p.terjual||0, Score:p.value_score.toFixed(1)}));
+        const bvDet = withScore.map(p=>({Produk:trunc(p.nama_produk,35), Brand:p.brand||'-', Harga:p.harga||'-', Rating:(p.rating||0).toFixed(1), Terjual:p.terjual||0, Score:p.rekomendasi_score.toFixed(1)}));
         document.getElementById('table-bv-detail').innerHTML = mkTblObj(bvDet, ['Produk','Brand','Harga','Rating','Terjual','Score']);
     }
 
@@ -537,13 +559,15 @@
         const d = filteredData;
         document.getElementById('table-count').textContent = d.length;
 
-        const fields = ['nama_produk','harga','penjual','kota','terjual','rating'];
+        const fields = ['nama_produk','harga','harga_sebelum_diskon','penjual','kota','terjual','rating','item_id','diskon_persen','liked_count','comment_count'];
+        const fieldLabels = {'item_id':'SKU','harga_sebelum_diskon':'Harga Asli','diskon_persen':'Diskon %','liked_count':'Total Favorit','comment_count':'Jumlah Ulasan'};
         let compH = '';
         fields.forEach(field => {
-            const filled = d.filter(p=>p[field]!=null&&p[field]!=='').length;
+            const filled = d.filter(p=>p[field]!=null&&p[field]!==''&&p[field]!==undefined).length;
             const pct = d.length>0 ? Math.round(filled/d.length*100) : 0;
             const color = pct>=90?'#10b981':pct>=60?'#f59e0b':'#ef4444';
-            compH += '<div style="margin-bottom:0.75rem;"><div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span style="color:#e2e8f0;font-weight:500;">'+field+'</span><span style="color:'+color+';">'+filled+'/'+d.length+' ('+pct+'%)</span></div><div class="completeness-bar"><div class="completeness-fill" style="width:'+pct+'%;background:'+color+';"></div></div></div>';
+            const label = fieldLabels[field]||field;
+            compH += '<div style="margin-bottom:0.75rem;"><div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span style="color:#e2e8f0;font-weight:500;">'+label+'</span><span style="color:'+color+';">'+filled+'/'+d.length+' ('+pct+'%)</span></div><div class="completeness-bar"><div class="completeness-fill" style="width:'+pct+'%;background:'+color+';"></div></div></div>';
         });
         document.getElementById('completeness-info').innerHTML = compH;
 
@@ -554,8 +578,86 @@
         const cities = new Set(d.map(p=>p.kota).filter(Boolean));
         document.getElementById('summary-info').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.8rem;"><div><span style="color:#94a3b8;">Total Produk:</span> <strong style="color:#e2e8f0;">'+d.length+'</strong></div><div><span style="color:#94a3b8;">Unique Seller:</span> <strong style="color:#e2e8f0;">'+sellers.size+'</strong></div><div><span style="color:#94a3b8;">Unique Brand:</span> <strong style="color:#e2e8f0;">'+brands.size+'</strong></div><div><span style="color:#94a3b8;">Unique Kota:</span> <strong style="color:#e2e8f0;">'+cities.size+'</strong></div><div><span style="color:#94a3b8;">Median Harga:</span> <strong style="color:#e2e8f0;">Rp'+(prices.length?Math.round(median(prices)).toLocaleString('id-ID'):'-')+'</strong></div><div><span style="color:#94a3b8;">Median Rating:</span> <strong style="color:#e2e8f0;">'+(ratings.length?median(ratings).toFixed(1):'-')+'</strong></div><div><span style="color:#94a3b8;">Marketplace:</span> <strong style="color:#60a5fa;">'+currentMarketplace.toUpperCase()+'</strong></div><div><span style="color:#94a3b8;">File:</span> <strong style="color:#e2e8f0;">'+document.getElementById('file-select').value.split('/').pop()+'</strong></div></div>';
 
-        const rows = d.map(p=>({Produk:trunc(p.nama_produk,50), Brand:p.brand||'-', Harga:p.harga||'-', Seller:p.penjual||'-', Kota:p.kota||'-', Terjual:p.terjual||'-', Rating:p.rating||'-'}));
-        document.getElementById('table-full-data').innerHTML = mkTblObj(rows, ['Produk','Brand','Harga','Seller','Kota','Terjual','Rating']);
+        const rows = d.map(p=>({
+            Produk:trunc(p.nama_produk,50),
+            Brand:p.brand||'-',
+            SKU:p.item_id||'-',
+            Harga:p.harga||'-',
+            Seller:p.penjual||'-',
+            Kota:p.kota||'-',
+            'Total Favorit':p.liked_count!=null?Number(p.liked_count).toLocaleString('id-ID'):'-',
+            'Jumlah Ulasan':p.comment_count!=null?Number(p.comment_count).toLocaleString('id-ID'):'-',
+            Terjual:p.terjual!=null?Number(p.terjual).toLocaleString('id-ID'):'-',
+            Rating:p.rating!=null?(+p.rating).toFixed(1):'-',
+            'Rekom Score':p.rekomendasi_score!=null?(+p.rekomendasi_score).toFixed(1):'-'
+        }));
+        document.getElementById('table-full-data').innerHTML = mkTblObj(rows, ['Produk','Brand','SKU','Harga','Seller','Kota','Total Favorit','Jumlah Ulasan','Terjual','Rating','Rekom Score']);
+    }
+
+    // ============ TAB 8: REKOMENDASI ============
+    function updateTabRekomendasi() {
+        const d = filteredData;
+        const withScore = d.filter(p=>p.rekomendasi_score>0).sort((a,b)=>b.rekomendasi_score-a.rekomendasi_score);
+
+        // Top 20 chart
+        const top20 = withScore.slice(0,20);
+        Plotly.newPlot('chart-rec-top', [{
+            x:top20.map(p=>p.rekomendasi_score),
+            y:top20.map(p=>trunc(p.nama_produk,35)),
+            type:'bar', orientation:'h', marker:{color:'#3b82f6'}
+        }], {...darkLayout, height:550, yaxis:{autorange:'reversed'}, xaxis:{title:'Rekomendasi Score'}}, {responsive:true});
+
+        // Engagement chart
+        const withEng = d.filter(p=>p.engagement_score>0).sort((a,b)=>b.engagement_score-a.engagement_score).slice(0,20);
+        Plotly.newPlot('chart-rec-engagement', [{
+            x:withEng.map(p=>p.engagement_score),
+            y:withEng.map(p=>trunc(p.nama_produk,35)),
+            type:'bar', orientation:'h', marker:{color:'#10b981'}
+        }], {...darkLayout, height:550, yaxis:{autorange:'reversed'}, xaxis:{title:'Engagement (Favorit + Ulasan)'}}, {responsive:true});
+
+        // Segmen dinamis
+        const segs = ['Budget','Mid-Range','Premium'];
+        let segHTML = '';
+        segs.forEach(seg=>{
+            const segData = withScore.filter(p=>p.price_segment===seg).slice(0,5);
+            if(!segData.length) return;
+            const rows = segData.map(p=>({
+                Produk: trunc(p.nama_produk,40),
+                Harga: p.harga||'-',
+                Rating: p.rating!=null?(+p.rating).toFixed(1):'-',
+                Terjual: p.terjual!=null?Number(p.terjual).toLocaleString('id-ID'):'-',
+                Score: p.rekomendasi_score!=null?(+p.rekomendasi_score).toFixed(1):'-'
+            }));
+            segHTML += '<div style="background:#0f172a;border-radius:8px;padding:1rem;"><b style="color:#94a3b8;font-size:0.8rem;">'+seg+'</b>'+mkTblObj(rows,['Produk','Harga','Rating','Terjual','Score'])+'</div>';
+        });
+        document.getElementById('rec-segment-container').innerHTML = segHTML || '<p style="color:#64748b;grid-column:1/-1;text-align:center;padding:1rem;">Tidak ada data segment</p>';
+
+        // Detail table
+        const detRows = top20.map(p=>({
+            Produk: trunc(p.nama_produk,40),
+            Brand: p.brand||'-',
+            Harga: p.harga||'-',
+            Rating: p.rating!=null?(+p.rating).toFixed(1):'-',
+            Terjual: p.terjual!=null?Number(p.terjual).toLocaleString('id-ID'):'-',
+            'Total Favorit': p.liked_count!=null?Number(p.liked_count).toLocaleString('id-ID'):'-',
+            'Jumlah Ulasan': p.comment_count!=null?Number(p.comment_count).toLocaleString('id-ID'):'-',
+            Diskon: p.diskon_persen!=null?p.diskon_persen.toFixed(1)+'%':'-',
+            Score: p.rekomendasi_score!=null?(+p.rekomendasi_score).toFixed(1):'-'
+        }));
+        document.getElementById('table-rec-detail').innerHTML = mkTblObj(detRows,['Produk','Brand','Harga','Rating','Terjual','Total Favorit','Jumlah Ulasan','Diskon','Score']);
+
+        // Breakdown score table
+        const brkRows = top20.map(p=>({
+            Produk: trunc(p.nama_produk,38),
+            'rTerjual': p.r_terjual!=null?(+p.r_terjual).toFixed(1):'-',
+            'rRating': p.r_rating!=null?(+p.r_rating).toFixed(1):'-',
+            'rHarga': p.r_harga!=null?(+p.r_harga).toFixed(1):'-',
+            'rFavorit': p.r_liked!=null?(+p.r_liked).toFixed(1):'-',
+            'rDiskon': p.r_diskon!=null?(+p.r_diskon).toFixed(1):'-',
+            'rUlasan': p.r_comment!=null?(+p.r_comment).toFixed(1):'-',
+            Score: p.rekomendasi_score!=null?(+p.rekomendasi_score).toFixed(1):'-'
+        }));
+        document.getElementById('table-rec-breakdown').innerHTML = mkTblObj(brkRows,['Produk','rTerjual','rRating','rHarga','rFavorit','rDiskon','rUlasan','Score']);
     }
 
     // ============ TAB SWITCH ============
@@ -569,7 +671,9 @@
     // ============ EXPORT CSV ============
     function exportCSV() {
         if (!filteredData.length) { alert('Tidak ada data!'); return; }
-        const cols = ['nama_produk','brand','harga','harga_angka','penjual','kota','terjual','rating','diskon_persen','value_score'];
+        const cols = ['nama_produk','brand','harga','harga_angka','penjual','kota','terjual','rating',
+                   'liked_count','comment_count','diskon_persen','engagement_score','rekomendasi_score',
+                   'price_segment','r_terjual','r_rating','r_harga','r_liked','r_diskon','r_comment','r_stock'];
         const hdr = cols.join(',');
         const rows = filteredData.map(p=>cols.map(c=>{let v=p[c]!=null?String(p[c]):'';if(v.includes(',')||v.includes('"'))v='"'+v.replace(/"/g,'""')+'"';return v;}).join(','));
         const csv = hdr+'\n'+rows.join('\n');

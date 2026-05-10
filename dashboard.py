@@ -6,7 +6,6 @@ Run: streamlit run dashboard.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import glob
 import os
 import re
@@ -165,8 +164,8 @@ c6.metric("Total Terjual", f"{int(df_f['terjual'].sum()):,}" if "terjual" in df_
 st.markdown("---")
 
 # Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "📊 Harga", "🏪 Seller", "📍 Lokasi", "📈 Penjualan", "🏷️ Diskon", "🏷️ Brand", "💎 Best Value"
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "📊 Harga", "🏪 Seller", "📍 Lokasi", "📈 Penjualan", "🏷️ Diskon", "🏷️ Brand", "💎 Best Value", "💡 Rekomendasi"
 ])
 
 # ============================================================
@@ -485,6 +484,99 @@ with tab7:
     st.subheader("Top 15 Detail")
     display = top_bv[["nama_produk", "brand", "harga", "rating", "terjual", "value_score"]].reset_index(drop=True)
     st.dataframe(display, use_container_width=True, hide_index=True)
+
+# ============================================================
+# TAB 8: REKOMENDASI
+# ============================================================
+with tab8:
+    st.header("💡 Rekomendasi Produk")
+    st.caption("Skor = (Terjual 30% | Rating 15% | Harga 15% | Favorit 15% | Diskon 10% | Ulasan 10% | Stock 5%)")
+
+    df_rec = df_f.copy()
+    df_rec["rating_safe"] = pd.to_numeric(df_rec.get("rating"), errors="coerce").fillna(0)
+    df_rec["terjual_safe"] = pd.to_numeric(df_rec.get("terjual"), errors="coerce").fillna(0)
+    df_rec["harga_safe"] = df_rec["harga_angka"].fillna(1)
+    df_rec["liked_safe"] = pd.to_numeric(df_rec.get("liked_count"), errors="coerce").fillna(0)
+    df_rec["cmc_safe"] = pd.to_numeric(df_rec.get("comment_count"), errors="coerce").fillna(0)
+    df_rec["diskon_safe"] = pd.to_numeric(df_rec.get("diskon_persen"), errors="coerce").fillna(0)
+    df_rec["stock_safe"] = pd.to_numeric(df_rec.get("stock"), errors="coerce").fillna(0)
+
+    def norm(series, higher=True):
+        mn, mx = series.min(), series.max()
+        if mx == mn:
+            return pd.Series(50, index=series.index)
+        normed = (series - mn) / (mx - mn) * 100
+        return normed if higher else 100 - normed
+
+    df_rec["r_rating"] = norm(df_rec["rating_safe"])
+    df_rec["r_terjual"] = norm(df_rec["terjual_safe"])
+    df_rec["r_liked"] = norm(df_rec["liked_safe"])
+    df_rec["r_cmc"] = norm(df_rec["cmc_safe"])
+    df_rec["r_harga"] = norm(df_rec["harga_safe"], higher=False)
+    df_rec["r_diskon"] = norm(df_rec["diskon_safe"])
+    df_rec["r_stock"] = norm(df_rec["stock_safe"])
+
+    df_rec["rekomendasi_score"] = round(
+        df_rec["r_rating"] * 0.15
+        + df_rec["r_terjual"] * 0.30
+        + df_rec["r_liked"] * 0.15
+        + df_rec["r_cmc"] * 0.10
+        + df_rec["r_harga"] * 0.15
+        + df_rec["r_diskon"] * 0.10
+        + df_rec["r_stock"] * 0.05,
+        2
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Top 20 Rekomendasi")
+        top_rec = df_rec[df_rec["rekomendasi_score"] > 0].nlargest(20, "rekomendasi_score")
+        fig = px.bar(top_rec, x="rekomendasi_score", y="nama_produk", orientation="h",
+                     labels={"rekomendasi_score": "Skor", "nama_produk": ""},
+                     color_discrete_sequence=["#2E75B6"])
+        fig.update_layout(height=550, yaxis=dict(autorange="reversed"))
+        fig.update_yaxes(ticktext=[n[:35] for n in top_rec["nama_produk"]], tickvals=top_rec["nama_produk"])
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.subheader("Engagement Tertinggi (Favorit + Ulasan)")
+        df_rec["engagement_score"] = df_rec["liked_safe"] + df_rec["cmc_safe"]
+        top_eng = df_rec[df_rec["engagement_score"] > 0].nlargest(20, "engagement_score")
+        fig2 = px.bar(top_eng, x="engagement_score", y="nama_produk", orientation="h",
+                      labels={"engagement_score": "Engagement", "nama_produk": ""},
+                      color_discrete_sequence=["#70AD47"])
+        fig2.update_layout(height=550, yaxis=dict(autorange="reversed"))
+        fig2.update_yaxes(ticktext=[n[:35] for n in top_eng["nama_produk"]], tickvals=top_eng["nama_produk"])
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # Segmentasi budget/mid/premium
+    st.subheader("Rekomendasi per Segmen Harga")
+    seg_col1, seg_col2, seg_col3 = st.columns(3)
+    for seg_idx, (seg_label, seg_df) in enumerate([
+        ("Budget < 5jt", df_rec[df_rec["harga_angka"] < 5_000_000]),
+        ("Mid-Range 5-15jt", df_rec[(df_rec["harga_angka"] >= 5_000_000) & (df_rec["harga_angka"] < 15_000_000)]),
+        ("Premium > 15jt", df_rec[df_rec["harga_angka"] >= 15_000_000]),
+    ]):
+        with [seg_col1, seg_col2, seg_col3][seg_idx]:
+            best_seg = seg_df[seg_df["rekomendasi_score"] > 0].nlargest(5, "rekomendasi_score")
+            st.markdown(f"**{seg_label}**")
+            rows_data = []
+            for _, r in best_seg.iterrows():
+                rows_data.append({
+                    "Produk": str(r.get("nama_produk", ""))[:40],
+                    "Harga": str(r.get("harga", "")),
+                    "Rating": float(r["rating_safe"]) if r["rating_safe"] > 0 else "-",
+                    "Terjual": int(r["terjual_safe"]) if r["terjual_safe"] > 0 else "-",
+                    "Score": float(r["rekomendasi_score"]),
+                })
+            st.dataframe(pd.DataFrame(rows_data), use_container_width=True, hide_index=True)
+
+    # Detail table
+    st.subheader("Detail Top 20 Rekomendasi")
+    disp_rec = top_rec[["nama_produk", "brand", "harga", "rating_safe", "terjual_safe",
+                        "liked_safe", "cmc_safe", "diskon_safe", "rekomendasi_score"]].reset_index(drop=True)
+    disp_rec.columns = ["Nama Produk", "Brand", "Harga", "Rating", "Terjual", "Total Favorit", "Jumlah Ulasan", "Diskon %", "Score"]
+    st.dataframe(disp_rec, use_container_width=True, hide_index=True)
 
 # ============================================================
 # DATA COMPLETENESS (footer)

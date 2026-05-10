@@ -221,33 +221,82 @@ class BlibliScraper(BaseScraper):
             if not nama_el:
                 nama_el = box.find('div', class_=re.compile(r'title'))
             if nama_el:
-                product['name'] = nama_el.get_text(strip=True)
+                product['nama_produk'] = nama_el.get_text(strip=True)
             else:
                 # Fallback: get from link title attribute
                 title_attr = box.get('title', '')
                 if title_attr:
-                    product['name'] = title_attr
+                    product['nama_produk'] = title_attr
                 else:
                     return None
         except Exception:
             return None
 
-        if not product.get('name') or len(product['name']) < 3:
+        if not product.get('nama_produk') or len(product['nama_produk']) < 3:
             return None
+
+        # === Extract item_id (SKU) ===
+        try:
+            # From href URL: pid=BLG-60035-03640-00001
+            href = box.get('href', '')
+            if href:
+                pid_match = re.search(r'[?&]pid=([A-Z0-9-]+)', href)
+                if pid_match:
+                    product['item_id'] = pid_match.group(1)
+            # Fallback: from element ID
+            if not product.get('item_id'):
+                card_id = box.get('id', '')
+                if 'product-card__' in card_id:
+                    pid_from_id = card_id.replace('product-card__', '')
+                    product['item_id'] = pid_from_id
+        except Exception:
+            pass
 
         # === Extract price ===
         try:
-            price_el = box.find('div', class_='els-product__fixed-price')
-            if not price_el:
-                price_el = box.find('div', class_=re.compile(r'price'))
-            if not price_el:
-                # Try finding any element with Rp text
-                price_el = box.find(string=re.compile(r'Rp\s*[\d.]+'))
+            # Final price: span.els-product__fixed-price (with label Rp)
+            price_wrapper = box.find('div', class_='els-product__fixed-price-wrapper')
+            if price_wrapper:
+                spans = price_wrapper.find_all('span')
+                # Last span inside wrapper contains the number (after "Rp" label)
+                for span in spans:
+                    text = span.get_text(strip=True)
+                    if re.search(r'[\d.]+', text):
+                        price_text = 'Rp' + text
+                        product['harga'] = price_text
+                        product['harga_angka'] = self._parse_price(price_text)
+                        break
+            # Fallback
+            if not product.get('harga'):
+                price_el = box.find('div', class_='els-product__fixed-price')
+                if price_el:
+                    price_text = price_el.get_text(strip=True)
+                    if price_text:
+                        product['harga'] = price_text
+                        product['harga_angka'] = self._parse_price(price_text)
+        except Exception:
+            pass
 
-            if price_el:
-                price_text = price_el.get_text(strip=True) if hasattr(price_el, 'get_text') else str(price_el)
-                product['price_text'] = price_text
-                product['price'] = self._parse_price(price_text)
+        # === Extract original price (harga coret) + diskon ===
+        try:
+            # Original price: span.els-product__discount-price (has title attr + lower opacity)
+            orig_price_el = box.find('span', class_='els-product__discount-price')
+            if orig_price_el:
+                orig_price_text = orig_price_el.get_text(strip=True)
+                if orig_price_text and re.search(r'[\d.]+', orig_price_text):
+                    product['harga_sebelum_diskon'] = 'Rp' + orig_price_text
+                    # Also get from title attribute (the same value)
+                    title_attr = orig_price_el.get('title', orig_price_text)
+                    if title_attr and title_attr != orig_price_text:
+                        product['harga_sebelum_diskon'] = title_attr if title_attr.startswith('Rp') else 'Rp' + title_attr
+
+            # Diskon percent: div.els-promo-label__text (e.g., "10% ")
+            diskon_el = box.find('div', class_=re.compile(r'els-promo-label__text'))
+            if diskon_el:
+                diskon_text = diskon_el.get_text(strip=True)
+                diskon_match = re.search(r'(\d+)', diskon_text)
+                if diskon_match:
+                    product['diskon_persen'] = int(diskon_match.group(1))
         except Exception:
             pass
 
@@ -256,22 +305,22 @@ class BlibliScraper(BaseScraper):
             seller_spans = box.find_all('span', class_='els-product__seller-name')
             if seller_spans:
                 if len(seller_spans) >= 3:
-                    product['seller'] = seller_spans[1].get_text(strip=True)
-                    product['location'] = seller_spans[2].get_text(strip=True)
+                    product['penjual'] = seller_spans[1].get_text(strip=True)
+                    product['kota'] = seller_spans[2].get_text(strip=True)
                 elif len(seller_spans) == 2:
                     text1 = seller_spans[0].get_text(strip=True)
                     text2 = seller_spans[1].get_text(strip=True)
                     if text1.startswith(('Kota ', 'Kab. ')):
-                        product['location'] = text1
+                        product['kota'] = text1
                     else:
-                        product['seller'] = text1
-                        product['location'] = text2
+                        product['penjual'] = text1
+                        product['kota'] = text2
                 elif len(seller_spans) == 1:
                     text = seller_spans[0].get_text(strip=True)
                     if text.startswith(('Kota ', 'Kab. ')):
-                        product['location'] = text
+                        product['kota'] = text
                     else:
-                        product['seller'] = text
+                        product['penjual'] = text
         except Exception:
             pass
 
@@ -279,8 +328,9 @@ class BlibliScraper(BaseScraper):
         try:
             sold_el = box.find('div', class_='els-product__sold')
             if sold_el:
-                product['sold_text'] = sold_el.get_text(strip=True)
-                product['sold_count'] = self._parse_sold(sold_el.get_text(strip=True))
+                sold_text = sold_el.get_text(strip=True)
+                product['terjual_text'] = sold_text
+                product['terjual'] = self._parse_sold(sold_text)
         except Exception:
             pass
 
@@ -309,7 +359,7 @@ class BlibliScraper(BaseScraper):
         try:
             img = box.find('img')
             if img:
-                product['image'] = img.get('data-src') or img.get('src', '')
+                product['gambar'] = img.get('data-src') or img.get('src', '')
         except Exception:
             pass
 

@@ -111,6 +111,15 @@ async def get_dashboard_data(marketplace: str, filename: str):
     try:
         df = pd.read_excel(str(filepath), sheet_name="Products")
 
+        # Rename columns that were renamed in the Products sheet export
+        # File baru: SKU→item_id, Total Favorit→liked_count, Jumlah Ulasan→comment_count
+        col_rename = {
+            "SKU": "item_id",
+            "Total Favorit": "liked_count",
+            "Jumlah Ulasan": "comment_count",
+        }
+        df.rename(columns={k: v for k, v in col_rename.items() if k in df.columns}, inplace=True)
+
         # Ensure harga_angka exists
         if "harga_angka" not in df.columns and "harga" in df.columns:
             df["harga_angka"] = df["harga"].apply(
@@ -154,12 +163,76 @@ async def get_dashboard_data(marketplace: str, filename: str):
         else:
             df["diskon_persen"] = None
 
-        # Compute value_score
+        # Compute value_score (legacy, kept for compatibility)
         terjual_safe = pd.to_numeric(df.get("terjual"), errors="coerce").fillna(0)
         rating_safe = pd.to_numeric(df.get("rating"), errors="coerce").fillna(0)
         harga_safe = df["harga_angka"].fillna(1)
         df["value_score"] = round((rating_safe * (terjual_safe + 1)) / (harga_safe / 1e6), 2)
         df.loc[harga_safe <= 0, "value_score"] = 0
+
+        # =====================================================
+        # DYNAMIC RECOMMENDATION SCORE (normalized 0-100)
+        # =====================================================
+        def norm(series, higher=True):
+            if not isinstance(series, pd.Series):
+                series = pd.Series(series, index=df.index)
+            mn, mx = series.min(), series.max()
+            if mx == mn or pd.isna(mx) or pd.isna(mn):
+                return pd.Series(50, index=series.index)
+            normed = (series - mn) / (mx - mn) * 100
+            return normed if higher else (100 - normed)
+
+        terjual_s = pd.to_numeric(df.get("terjual", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        rating_s = pd.to_numeric(df.get("rating", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        harga_s = pd.to_numeric(df["harga_angka"], errors="coerce").fillna(1)
+        harga_s = harga_s.where(harga_s != 0, 1)  # avoid div by zero — stays Series
+        liked_s = pd.to_numeric(df.get("liked_count", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        comment_s = pd.to_numeric(df.get("comment_count", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        diskon_s = pd.to_numeric(df.get("diskon_persen", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        stock_s = pd.to_numeric(df.get("stock", pd.Series(dtype=float)), errors="coerce").fillna(0)
+
+        df["r_terjual"] = norm(terjual_s)
+        df["r_rating"] = norm(rating_s)
+        df["r_harga"] = norm(harga_s, higher=False)  # cheaper = higher score
+        df["r_liked"] = norm(liked_s)
+        df["r_comment"] = norm(comment_s)
+        df["r_diskon"] = norm(diskon_s)
+        df["r_stock"] = norm(stock_s)
+
+        df["rekomendasi_score"] = round(
+            df["r_terjual"] * 0.30
+            + df["r_rating"] * 0.15
+            + df["r_harga"] * 0.15
+            + df["r_liked"] * 0.15
+            + df["r_diskon"] * 0.10
+            + df["r_comment"] * 0.10
+            + df["r_stock"] * 0.05,
+            2
+        )
+
+        # Engagement score (liked + comment combined)
+        df["engagement_score"] = (liked_s + comment_s).round(0).astype("Int64")
+
+        # Dynamic price segment based on percentiles
+        harga_clean = harga_s[harga_s > 0]
+        if len(harga_clean) >= 4:
+            p25 = float(harga_clean.quantile(0.25))
+            p75 = float(harga_clean.quantile(0.75))
+        else:
+            p25 = float(harga_clean.median()) if len(harga_clean) else 5000000.0
+            p75 = p25 * 3
+
+        def price_segment(h):
+            if pd.isna(h) or h <= 0:
+                return "Lainnya"
+            if h < p25:
+                return "Budget"
+            elif h <= p75:
+                return "Mid-Range"
+            else:
+                return "Premium"
+
+        df["price_segment"] = df["harga_angka"].apply(price_segment)
 
         # Convert to JSON-safe format (handle NaN, inf, -inf)
         df = df.replace([np.inf, -np.inf], None)
@@ -286,7 +359,7 @@ def run_scraping_job(job_id, marketplace, keyword, pages, mode, filters):
         send_ws_message(job_id, "status", {"message": "[{}] Memulai proses scraping...".format(marketplace.upper())})
 
         if marketplace == "blibli":
-            result = run_blibli_job(job_id, keyword, pages, mode, filters)
+            result = run_blibli_job(job_id, keyword, pages, mode, filters, use_cloak=True)
         elif marketplace == "shopee":
             result = run_shopee_job(job_id, keyword, pages, mode, filters)
         else:
@@ -306,24 +379,36 @@ def run_scraping_job(job_id, marketplace, keyword, pages, mode, filters):
         send_ws_message(job_id, "error", {"message": str(e)[:100]})
 
 
-def run_blibli_job(job_id, keyword, pages, mode, filters):
-    """Run Blibli scraping job - undetected-chromedriver + HTML parsing"""
+def run_blibli_job(job_id, keyword, pages, mode, filters, use_cloak=False):
+    """Run Blibli scraping job.
+
+    Supports two modes:
+    - use_cloak=False (default): undetected-chromedriver (Selenium-based)
+    - use_cloak=True: CloakBrowser (C++ anti-detection, bypasses Cloudflare)
+
+    CloakBrowser is recommended for production as it's more resilient.
+    """
     import time
+    import asyncio
+    from urllib.parse import quote_plus
+    from bs4 import BeautifulSoup
+
+    if use_cloak:
+        return _run_blibli_job_cloak(job_id, keyword, pages, mode, filters)
+
+    # Import helpers only for ucdriver path
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tests" / "blibli"))
+    from test_full_scrape import build_url, extract_product_thorough, fetch_seller_from_detail
+    from exporters.excel_analytics import export_with_analytics
+    from core.brand_manager import BrandManager
+
+    # ===== DEFAULT: undetected-chromedriver approach =====
+    send_ws_message(job_id, "status", {"message": "[BLIBLI] Membuka Chrome browser..."})
+
     import undetected_chromedriver as uc
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    from urllib.parse import quote_plus
-    from bs4 import BeautifulSoup
-
-    sys.path.insert(0, str(Path(__file__).parent.parent / "tests" / "blibli"))
-    from test_full_scrape import (
-        build_url, extract_product_thorough, fetch_seller_from_detail,
-    )
-    from exporters.excel_analytics import export_with_analytics
-    from core.brand_manager import BrandManager
-
-    send_ws_message(job_id, "status", {"message": "[BLIBLI] Membuka Chrome browser..."})
 
     options = uc.ChromeOptions()
     options.add_argument("--start-maximized")
@@ -445,6 +530,158 @@ def run_blibli_job(job_id, keyword, pages, mode, filters):
         return {"total": len(all_products), "file": os.path.basename(filepath)}
 
     return None
+
+
+# ===== CLOAKBROWSER APPROACH (C++ anti-detection, bypasses Cloudflare) =====
+def _run_blibli_job_cloak(job_id, keyword, pages, mode, filters):
+    """Run Blibli scraping using CloakBrowser (C++ anti-detection patches).
+
+    This function is called when use_cloak=True or when undetected-chromedriver
+    fails due to anti-bot challenge detection.
+
+    CloakBrowser advantages:
+    - 49 C++ source-level patches (canvas, WebGL, fonts, GPU, etc.)
+    - Survives Chrome updates
+    - reCAPTCHA v3 score ~0.9 (human-level)
+    - Auto-generates random fingerprint at startup
+    """
+    import asyncio
+    import cloakbrowser
+    from bs4 import BeautifulSoup
+
+    # Import helpers from test module
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tests" / "blibli"))
+    from test_full_scrape import build_url, extract_product_thorough
+    from exporters.excel_analytics import export_with_analytics
+
+    send_ws_message(job_id, "status", {
+        "message": "[BLIBLI] Membuka CloakBrowser (C++ anti-detection)..."
+    })
+
+    async def _scrape():
+        browser = await cloakbrowser.launch_async(headless=True, geoip=True)
+        all_products = []
+
+        try:
+            for page_num in range(1, pages + 1):
+                url = build_url(keyword, page_num, filters)
+                send_ws_message(job_id, "progress", {
+                    "message": f"[BLIBLI] 📄 Page {page_num}/{pages}: Memuat halaman pencarian...",
+                    "page": page_num,
+                })
+
+                page = await browser.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+
+                # Wait for products to render (CloakBrowser needs ~4-5s)
+                await asyncio.sleep(5)
+
+                # Check for challenge redirect
+                if "challenge" in page.url.lower():
+                    send_ws_message(job_id, "status", {
+                        "message": f"[BLIBLI] ⚠️ Challenge terdeteksi di page {page_num}"
+                    })
+
+                # Scroll to trigger lazy load
+                send_ws_message(job_id, "status", {
+                    "message": f"[BLIBLI] 📄 Page {page_num}/{pages}: Scrolling..."
+                })
+                for i in range(8):
+                    await page.evaluate(
+                        f"window.scrollTo(0, document.body.scrollHeight * {(i+1)*12}/100);"
+                    )
+                    await asyncio.sleep(2)
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                await asyncio.sleep(5)
+
+                # Parse
+                send_ws_message(job_id, "status", {
+                    "message": f"[BLIBLI] 📄 Page {page_num}/{pages}: Extracting produk..."
+                })
+                html = await page.content()
+                soup = BeautifulSoup(html, "html.parser")
+
+                # Blibli product cards
+                boxes = soup.find_all("a", class_="elf-product-card")
+                # Fallback selectors if primary doesn't work
+                if not boxes:
+                    boxes = soup.select('a[href*="/p/"]')
+
+                page_products = []
+                for box in boxes:
+                    product = extract_product_thorough(box)
+                    if product:
+                        product["page"] = page_num
+                        product["keyword"] = keyword
+                        product["scrape_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        page_products.append(product)
+
+                all_products.extend(page_products)
+                send_ws_message(job_id, "progress", {
+                    "message": f"[BLIBLI] ✅ Page {page_num}/{pages}: {len(page_products)} produk "
+                               f"(Total: {len(all_products)})",
+                    "page": page_num,
+                    "products": len(all_products),
+                })
+
+                await page.close()
+
+                if page_num < pages:
+                    send_ws_message(job_id, "status", {
+                        "message": f"[BLIBLI] Menunggu sebelum page berikutnya..."
+                    })
+                    await asyncio.sleep(8)
+
+            # Handle missing sellers
+            missing = [p for p in all_products if not p.get("penjual")]
+            if missing:
+                if mode == "cepat":
+                    for p in missing:
+                        p["penjual"] = "Seller Individu"
+                    send_ws_message(job_id, "status", {
+                        "message": f"[BLIBLI] {len(missing)} seller ditandai 'Individu' (mode cepat)"
+                    })
+                elif mode == "lengkap":
+                    send_ws_message(job_id, "status", {
+                        "message": f"[BLIBLI] Mengambil detail {len(missing)} seller (mode lengkap)..."
+                    })
+                    for i, p in enumerate(missing):
+                        link = p.get("link", "")
+                        if link:
+                            try:
+                                detail_page = await browser.new_page()
+                                await detail_page.goto(link, wait_until="domcontentloaded", timeout=30000)
+                                await asyncio.sleep(3)
+                                detail_html = await detail_page.content()
+                                detail_soup = BeautifulSoup(detail_html, "html.parser")
+                                seller_el = detail_soup.select_one("[class*='seller'], [class*='merchant'], [class*='toko']")
+                                p["penjual"] = seller_el.get_text(strip=True) if seller_el else "Seller Individu"
+                                await detail_page.close()
+                            except Exception:
+                                p["penjual"] = "Seller Individu"
+                        else:
+                            p["penjual"] = "Seller Individu"
+                        await asyncio.sleep(2)
+
+        finally:
+            await browser.close()
+
+        # Export
+        if all_products:
+            send_ws_message(job_id, "status", {
+                "message": f"[BLIBLI] Mengexport {len(all_products)} produk ke Excel..."
+            })
+            hasil_dir = str(Path(__file__).parent.parent / "hasil" / "blibli")
+            filepath = export_with_analytics(all_products, keyword, filters, output_dir=hasil_dir)
+            return {"total": len(all_products), "file": os.path.basename(filepath)}
+
+        return None
+
+    try:
+        return asyncio.run(_scrape())
+    except Exception as e:
+        send_ws_message(job_id, "error", {"message": f"[BLIBLI] CloakBrowser error: {str(e)[:100]}"})
+        return None
 
 
 def run_shopee_job(job_id, keyword, pages, mode, filters):

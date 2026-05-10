@@ -38,7 +38,7 @@ env/
 
 # Environment
 .env
-
+.env.example
 # Logs
 logs/
 *.log
@@ -53,3 +53,23 @@ Thumbs.db
 # Proxy lists
 proxies.txt
 proxy_list.txt
+# Added by code-review-graph
+.code-review-graph/
+
+# IDE Config Files (not needed in repo)
+.cursorrules
+.mcp.json
+.opencode.json
+.windsurfrules
+AGENTS.md
+CLAUDE.md
+CLAUDE_SKILL.md
+GEMINI.md
+QODER.md
+
+# Tool-specific configs
+.gemini/
+.github/
+.kiro/
+.qoder/
+excel_mcp_temp/

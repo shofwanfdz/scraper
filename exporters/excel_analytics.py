@@ -34,7 +34,15 @@ BORDER = Border(
 
 
 def _title(ws, row, text):
-    ws.cell(row=row, column=1, value=text).font = TITLE_FONT
+    c = ws.cell(row=row, column=1, value=text)
+    c.font = TITLE_FONT
+    return row + 1
+
+
+def _subtitle(ws, row, text):
+    """Write italic subtitle text, returns incremented row."""
+    c = ws.cell(row=row, column=1, value=text)
+    c.font = SUBTITLE_FONT
     return row + 1
 
 
@@ -163,10 +171,16 @@ def export_with_analytics(products, keyword, filters=None, output_dir="hasil/bli
     # Extract brand from product name
     df["brand"] = df["nama_produk"].apply(_extract_brand)
 
-    # Sheet 1: Products
+    # Sheet 1: Products — rename columns for display
+    COL_RENAME = {
+        "item_id": "SKU",
+        "liked_count": "Total Favorit",
+        "comment_count": "Jumlah Ulasan",
+    }
+
     col_order = [
         # --- Field Wajib ---
-        "nama_produk", "brand", "harga", "harga_angka", "harga_sebelum_diskon",
+        "nama_produk", "brand", "harga", "harga_angka", "harga_sebelum_diskon", "diskon_persen",
         "penjual", "kota", "terjual", "rating",
         # --- Field Rekomendasi (Affiliator) ---
         "item_id", "stock", "liked_count", "comment_count", "free_shipping", "seller_type",
@@ -175,7 +189,8 @@ def export_with_analytics(products, keyword, filters=None, output_dir="hasil/bli
         "badge", "cicilan", "link", "gambar", "page", "keyword", "scrape_time"
     ]
     existing = [c for c in col_order if c in df.columns]
-    df[existing].to_excel(filepath, index=False, sheet_name="Products", engine="openpyxl")
+    df_export = df[existing].rename(columns=COL_RENAME)
+    df_export.to_excel(filepath, index=False, sheet_name="Products", engine="openpyxl")
 
     wb = load_workbook(filepath)
     ws = wb["Products"]
@@ -211,6 +226,7 @@ def export_with_analytics(products, keyword, filters=None, output_dir="hasil/bli
     _build_brand(wb, df)
     _build_best_value(wb, df)
     _build_rekomendasi(wb, df)
+    _build_rekomendasi_v2(wb, df)
     _build_dashboard(wb, df, keyword, filters, marketplace)
 
     # Reorder: Dashboard after Products
@@ -712,8 +728,7 @@ def _build_best_value(wb, df):
 
     # Section 1: Top 15 Best Value Products
     row = _title(ws, row, "TOP 15 PRODUK BEST VALUE")
-    ws.cell(row=row, column=1, value="Skor = (Rating x Terjual) / (Harga/1jt) - Semakin tinggi semakin worth it").font = SUBTITLE_FONT
-    row += 1
+    row = _subtitle(ws, row, "Skor = (Rating x Terjual) / (Harga/1jt) - Semakin tinggi semakin worth it")
 
     top_value = df_scored[df_scored["value_score"] > 0].nlargest(15, "value_score")
     data_start = row
@@ -735,8 +750,7 @@ def _build_best_value(wb, df):
 
     # Section 2: Best Value per Brand
     row = _title(ws, row, "BEST VALUE PER BRAND")
-    ws.cell(row=row, column=1, value="Produk dengan value score tertinggi di setiap brand").font = SUBTITLE_FONT
-    row += 1
+    row = _subtitle(ws, row, "Produk dengan value score tertinggi di setiap brand")
     row = _header(ws, row, ["Brand", "Produk", "Harga", "Rating", "Score"])
 
     if "brand" in df_scored.columns:
@@ -772,8 +786,7 @@ def _build_best_value(wb, df):
     # Section 3: Diskon vs Rating scatter
     if df_bv["diskon_persen"].notna().any() and "rating" in df_bv.columns:
         row = _title(ws, row, "KORELASI DISKON VS RATING")
-        ws.cell(row=row, column=1, value="Apakah produk diskon besar memiliki rating rendah?").font = SUBTITLE_FONT
-        row += 1
+        row = _subtitle(ws, row, "Apakah produk diskon besar memiliki rating rendah?")
 
         scatter_df = df_bv[df_bv["diskon_persen"].notna() & df_bv["rating"].notna()][["diskon_persen", "rating"]].head(50)
         if len(scatter_df) > 3:
@@ -861,7 +874,7 @@ def _build_rekomendasi(wb, df):
         row = _title(ws, row, "TOP 10 PRODUK PALING DISUKAI (LIKED)")
         data_start = row
         top_liked = df[df["liked_count"].notna()].nlargest(10, "liked_count")
-        row = _header(ws, row, ["Nama Produk", "Harga", "Liked", "Terjual", "Rating"])
+        row = _header(ws, row, ["Nama Produk", "Harga", "Total Favorit", "Terjual", "Rating"])
         for _, r in top_liked.iterrows():
             row = _row(ws, row, [
                 str(r.get("nama_produk", ""))[:45],
@@ -878,7 +891,7 @@ def _build_rekomendasi(wb, df):
         row = _title(ws, row, "TOP 10 PRODUK PALING BANYAK ULASAN (COMMENT)")
         data_start = row
         top_cmc = df[df["comment_count"].notna()].nlargest(10, "comment_count")
-        row = _header(ws, row, ["Nama Produk", "Harga", "Comment", "Terjual", "Rating"])
+        row = _header(ws, row, ["Nama Produk", "Harga", "Jumlah Ulasan", "Terjual", "Rating"])
         for _, r in top_cmc.iterrows():
             row = _row(ws, row, [
                 str(r.get("nama_produk", ""))[:45],
@@ -913,11 +926,10 @@ def _build_rekomendasi(wb, df):
         df_inter["interaksi_score"] = df_inter["liked_safe"] + df_inter["cmc_safe"]
 
         row = _title(ws, row, "TOP 10 PRODUK DENGAN INTERAKSI TERTINGGI")
-        ws.cell(row=row, column=1, value="Skor = Liked Count + Comment Count").font = SUBTITLE_FONT
-        row += 1
+        row = _subtitle(ws, row, "Skor = Liked Count + Comment Count")
         data_start = row
         top_inter = df_inter[df_inter["interaksi_score"] > 0].nlargest(10, "interaksi_score")
-        row = _header(ws, row, ["Nama Produk", "Harga", "Liked", "Comment", "Interaksi Score"])
+        row = _header(ws, row, ["Nama Produk", "Harga", "Total Favorit", "Jumlah Ulasan", "Interaksi Score"])
         for _, r in top_inter.iterrows():
             row = _row(ws, row, [
                 str(r.get("nama_produk", ""))[:45],
@@ -943,8 +955,221 @@ def _build_rekomendasi(wb, df):
 
 
 # ============================================================
-# ECOMMERCE SCRAPING (Summary Sheet)
+# ANALISIS FIELD REKOMENDASI (AFFILIATOR) — SHEET v2: REKOMENDASI
 # ============================================================
+
+def _build_rekomendasi_v2(wb, df):
+    """Sheet baru: Rekomendasi produk untuk affiliator/user."""
+    ws = wb.create_sheet("Rekomendasi")
+    row = 1
+
+    # Score: kombinasi rating, liked, comments, terjual, diskon
+    df_r = df.copy()
+    df_r["rating_safe"] = pd.to_numeric(df_r.get("rating", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    df_r["terjual_safe"] = pd.to_numeric(df_r.get("terjual", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    df_r["harga_safe"] = df_r["harga_angka"].fillna(1)
+    df_r["liked_safe"] = pd.to_numeric(df_r.get("liked_count", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    df_r["cmc_safe"] = pd.to_numeric(df_r.get("comment_count", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    df_r["diskon_safe"] = pd.to_numeric(df_r.get("diskon_persen", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    df_r["stock_safe"] = pd.to_numeric(df_r.get("stock", pd.Series(dtype=float)), errors="coerce").fillna(0)
+
+    # Weight: terjual (paling penting), rating, liked, comment, diskon
+    # Skor normalisasi 0-100
+    def norm(series, higher=True):
+        mn, mx = series.min(), series.max()
+        if mx == mn:
+            return pd.Series(50, index=series.index)
+        normed = (series - mn) / (mx - mn) * 100
+        return normed if higher else 100 - normed
+
+    df_r["r_rating"] = norm(df_r["rating_safe"])
+    df_r["r_terjual"] = norm(df_r["terjual_safe"])
+    df_r["r_liked"] = norm(df_r["liked_safe"])
+    df_r["r_cmc"] = norm(df_r["cmc_safe"])
+    df_r["r_harga"] = norm(df_r["harga_safe"], higher=False)  # murah = lebih baik
+    df_r["r_diskon"] = norm(df_r["diskon_safe"])
+    df_r["r_stock"] = norm(df_r["stock_safe"])
+
+    # Rekomendasi Score (weighted average)
+    df_r["rekomendasi_score"] = round(
+        df_r["r_rating"] * 0.15
+        + df_r["r_terjual"] * 0.30
+        + df_r["r_liked"] * 0.15
+        + df_r["r_cmc"] * 0.10
+        + df_r["r_harga"] * 0.15
+        + df_r["r_diskon"] * 0.10
+        + df_r["r_stock"] * 0.05,
+        2
+    )
+
+    # === Section 1: Header Info ===
+    ws.merge_cells("A1:J1")
+    ws.cell(row=1, column=1,
+            value="📋 REKOMENDASI PRODUK — BERDASARKAN ANALISIS MULTI-KRITERIA").font = Font(bold=True, size=13, color="1F4E79")
+    ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
+    row = 3
+
+    ws.cell(row=row, column=1,
+            value="Bobot: Terjual 30% | Rating 15% | Harga 15% | Liked 15% | Diskon 10% | Comment 10% | Stock 5%").font = SUBTITLE_FONT
+    row += 1
+
+    # === Section 2: Top Rekomendasi (Top 20) ===
+    row = _title(ws, row, "TOP 20 REKOMENDASI PRODUK")
+    top_rec = df_r[df_r["rekomendasi_score"] > 0].nlargest(20, "rekomendasi_score")
+    data_start = row
+    headers = ["Nama Produk", "Harga", "Rating", "Terjual", "Total Favorit", "Jumlah Ulasan",
+               "Seller", "Diskon %", "Score"]
+    row = _header(ws, row, headers)
+    for _, r in top_rec.iterrows():
+        row = _row(ws, row, [
+            str(r.get("nama_produk", ""))[:50],
+            str(r.get("harga", "")),
+            float(r["rating_safe"]) if r["rating_safe"] > 0 else "",
+            int(r["terjual_safe"]) if r["terjual_safe"] > 0 else "",
+            int(r["liked_safe"]) if r["liked_safe"] > 0 else "",
+            int(r["cmc_safe"]) if r["cmc_safe"] > 0 else "",
+            str(r.get("penjual", ""))[:30],
+            "{:.1f}%".format(r["diskon_safe"]) if r["diskon_safe"] > 0 else "-",
+            float(r["rekomendasi_score"]),
+        ])
+
+    # Bar chart for scores
+    _bar_chart(ws, "Skor Rekomendasi", 9, 1, data_start, data_start + len(top_rec), data_start, horizontal=True)
+    row = max(row, data_start + CHART_ROWS + 3) + SECTION_GAP
+
+    # === Section 3: Best Value Murah ===
+    row = _title(ws, row, "BEST VALUE — HARGA DI BAWAH 5 JUTA")
+    df_budget = df_r[(df_r["harga_angka"] < 5_000_000) & (df_r["harga_angka"] > 0)]
+    budget_best = df_budget[df_budget["rekomendasi_score"] > 0].nlargest(10, "rekomendasi_score")
+    row = _header(ws, row, ["Nama Produk", "Harga", "Rating", "Terjual", "Favorit", "Ulasan", "Seller", "Score"])
+    for _, r in budget_best.iterrows():
+        row = _row(ws, row, [
+            str(r.get("nama_produk", ""))[:50], str(r.get("harga", "")),
+            float(r["rating_safe"]) if r["rating_safe"] > 0 else "",
+            int(r["terjual_safe"]) if r["terjual_safe"] > 0 else "",
+            int(r["liked_safe"]) if r["liked_safe"] > 0 else "",
+            int(r["cmc_safe"]) if r["cmc_safe"] > 0 else "",
+            str(r.get("penjual", ""))[:30],
+            float(r["rekomendasi_score"]),
+        ])
+    row += SECTION_GAP
+
+    # === Section 4: Best Value Mid-Range ===
+    row = _title(ws, row, "BEST VALUE — HARGA 5-15 JUTA")
+    df_mid = df_r[(df_r["harga_angka"] >= 5_000_000) & (df_r["harga_angka"] < 15_000_000)]
+    mid_best = df_mid[df_mid["rekomendasi_score"] > 0].nlargest(10, "rekomendasi_score")
+    row = _header(ws, row, ["Nama Produk", "Harga", "Rating", "Terjual", "Favorit", "Ulasan", "Seller", "Score"])
+    for _, r in mid_best.iterrows():
+        row = _row(ws, row, [
+            str(r.get("nama_produk", ""))[:50], str(r.get("harga", "")),
+            float(r["rating_safe"]) if r["rating_safe"] > 0 else "",
+            int(r["terjual_safe"]) if r["terjual_safe"] > 0 else "",
+            int(r["liked_safe"]) if r["liked_safe"] > 0 else "",
+            int(r["cmc_safe"]) if r["cmc_safe"] > 0 else "",
+            str(r.get("penjual", ""))[:30],
+            float(r["rekomendasi_score"]),
+        ])
+    row += SECTION_GAP
+
+    # === Section 5: Best Value Premium ===
+    row = _title(ws, row, "BEST VALUE — HARGA DI ATAS 15 JUTA")
+    df_prem = df_r[df_r["harga_angka"] >= 15_000_000]
+    prem_best = df_prem[df_prem["rekomendasi_score"] > 0].nlargest(10, "rekomendasi_score")
+    row = _header(ws, row, ["Nama Produk", "Harga", "Rating", "Terjual", "Favorit", "Ulasan", "Seller", "Score"])
+    for _, r in prem_best.iterrows():
+        row = _row(ws, row, [
+            str(r.get("nama_produk", ""))[:50], str(r.get("harga", "")),
+            float(r["rating_safe"]) if r["rating_safe"] > 0 else "",
+            int(r["terjual_safe"]) if r["terjual_safe"] > 0 else "",
+            int(r["liked_safe"]) if r["liked_safe"] > 0 else "",
+            int(r["cmc_safe"]) if r["cmc_safe"] > 0 else "",
+            str(r.get("penjual", ""))[:30],
+            float(r["rekomendasi_score"]),
+        ])
+    row += SECTION_GAP
+
+    # === Section 6: High Engagement (banyak liked + comment) ===
+    if "liked_safe" in df_r.columns and "cmc_safe" in df_r.columns:
+        row = _title(ws, row, "PRODUK DENGAN ENGAGEMENT TERTINGGI")
+        row = _subtitle(ws, row, "Produk yang paling banyak mendapat perhatian (favorit + ulasan)")
+        df_r["engagement_score"] = df_r["liked_safe"] + df_r["cmc_safe"]
+        top_eng = df_r[df_r["engagement_score"] > 0].nlargest(10, "engagement_score")
+        row = _header(ws, row, ["Nama Produk", "Total Favorit", "Jumlah Ulasan", "Harga", "Seller", "Engagement"])
+        for _, r in top_eng.iterrows():
+            row = _row(ws, row, [
+                str(r.get("nama_produk", ""))[:50],
+                int(r["liked_safe"]) if r["liked_safe"] > 0 else "",
+                int(r["cmc_safe"]) if r["cmc_safe"] > 0 else "",
+                str(r.get("harga", "")),
+                str(r.get("penjual", ""))[:30],
+                int(r["engagement_score"]),
+            ])
+        row += SECTION_GAP
+
+    # === Section 7: Official / Flagship Seller ===
+    if "seller_type" in df_r.columns:
+        row = _title(ws, row, "REKOMENDASI PRODUK DARI SELLER OFFICIAL/FLAGSHIP")
+        official = df_r[df_r["seller_type"].notna()
+                       & df_r["seller_type"].str.contains("Official|Flagship|Mall", case=False, na=False)]
+        official_scored = official[official["rekomendasi_score"] > 0].nlargest(10, "rekomendasi_score")
+        row = _header(ws, row, ["Nama Produk", "Harga", "Rating", "Terjual", "Favorit", "Ulasan", "Tipe Seller", "Score"])
+        for _, r in official_scored.iterrows():
+            row = _row(ws, row, [
+                str(r.get("nama_produk", ""))[:50], str(r.get("harga", "")),
+                float(r["rating_safe"]) if r["rating_safe"] > 0 else "",
+                int(r["terjual_safe"]) if r["terjual_safe"] > 0 else "",
+                int(r["liked_safe"]) if r["liked_safe"] > 0 else "",
+                int(r["cmc_safe"]) if r["cmc_safe"] > 0 else "",
+                str(r.get("seller_type", "")),
+                float(r["rekomendasi_score"]),
+            ])
+        row += SECTION_GAP
+
+    # === Section 8: Flash Sale Rekomendasi ===
+    if "flash_sale" in df_r.columns and df_r["flash_sale"].notna().any():
+        row = _title(ws, row, "REKOMENDASI PRODUK FLASH SALE")
+        flash_rec = df_r[df_r["flash_sale"] == "Ya"]
+        if len(flash_rec) > 0:
+            flash_best = flash_rec[flash_rec["rekomendasi_score"] > 0].nlargest(10, "rekomendasi_score")
+            row = _header(ws, row, ["Nama Produk", "Harga", "Diskon %", "Terjual", "Favorit", "Ulasan", "Seller", "Score"])
+            for _, r in flash_best.iterrows():
+                row = _row(ws, row, [
+                    str(r.get("nama_produk", ""))[:50], str(r.get("harga", "")),
+                    "{:.1f}%".format(r["diskon_safe"]) if r["diskon_safe"] > 0 else "-",
+                    int(r["terjual_safe"]) if r["terjual_safe"] > 0 else "",
+                    int(r["liked_safe"]) if r["liked_safe"] > 0 else "",
+                    int(r["cmc_safe"]) if r["cmc_safe"] > 0 else "",
+                    str(r.get("penjual", ""))[:30],
+                    float(r["rekomendasi_score"]),
+                ])
+        else:
+            row = _row(ws, row, ["Tidak ada produk flash sale"])
+        row += SECTION_GAP
+
+    # === Section 9: Score Breakdown ===
+    row = _title(ws, row, "DETAIL SKOR — SEMUA PRODUK (TOP 50)")
+    ws.cell(row=row, column=1,
+            value="Terjual, Rating, Harga, Liked, Diskon, Comment, Stock masing-masing dinormalisasi 0-100").font = SUBTITLE_FONT
+    row += 1
+    detail = df_r[df_r["rekomendasi_score"] > 0].nlargest(50, "rekomendasi_score")
+    row = _header(ws, row, ["Nama Produk", "Harga", "rTerjual", "rRating", "rHarga", "rLiked", "rDiskon", "rComment", "Score"])
+    for _, r in detail.iterrows():
+        row = _row(ws, row, [
+            str(r.get("nama_produk", ""))[:40],
+            str(r.get("harga", "")),
+            round(float(r["r_terjual"]), 1),
+            round(float(r["r_rating"]), 1),
+            round(float(r["r_harga"]), 1),
+            round(float(r["r_liked"]), 1),
+            round(float(r["r_diskon"]), 1),
+            round(float(r["r_cmc"]), 1),
+            float(r["rekomendasi_score"]),
+        ])
+
+    _auto_width(ws, 9)
+
+
+
 
 def _build_dashboard(wb, df, keyword, filters=None, marketplace="blibli"):
     ws = wb.create_sheet("Ecommerce Scraping")
@@ -974,10 +1199,10 @@ def _build_dashboard(wb, df, keyword, filters=None, marketplace="blibli"):
         ["Produk Diskon", int(df["diskon_persen"].notna().sum())],
         ["Avg Diskon", "{:.1f}%".format(df["diskon_persen"].mean()) if df["diskon_persen"].notna().any() else "N/A"],
         # --- Field Rekomendasi ---
-        ["Total Item ID", int(df["item_id"].notna().sum()) if "item_id" in df.columns else "N/A"],
+        ["Total SKU", int(df["item_id"].notna().sum()) if "item_id" in df.columns else "N/A"],
         ["Produk Ada Stock", int(df["stock"].notna().sum()) if "stock" in df.columns else "N/A"],
-        ["Total liked_count", "{:,}".format(int(df["liked_count"].sum())) if "liked_count" in df.columns and df["liked_count"].notna().any() else "N/A"],
-        ["Total Comment", "{:,}".format(int(df["comment_count"].sum())) if "comment_count" in df.columns and df["comment_count"].notna().any() else "N/A"],
+        ["Total Favorit", "{:,}".format(int(df["liked_count"].sum())) if "liked_count" in df.columns and df["liked_count"].notna().any() else "N/A"],
+        ["Total Jumlah Ulasan", "{:,}".format(int(df["comment_count"].sum())) if "comment_count" in df.columns and df["comment_count"].notna().any() else "N/A"],
         ["Free Shipping", int(df["free_shipping"].notna().sum()) if "free_shipping" in df.columns else "N/A"],
         ["Flash Sale", int(df["flash_sale"].notna().sum()) if "flash_sale" in df.columns else "N/A"],
     ]
@@ -1012,12 +1237,13 @@ def _build_dashboard(wb, df, keyword, filters=None, marketplace="blibli"):
                   # Field Rekomendasi
                   "item_id", "stock", "liked_count", "comment_count", "free_shipping", "seller_type"]:
         if field in df.columns:
+            friendly_name = {"item_id": "SKU", "liked_count": "Total Favorit", "comment_count": "Jumlah Ulasan"}.get(field, field)
             complete = int(df[field].notna().sum())
             if df[field].dtype == "object":
                 complete = int((df[field].notna() & (df[field] != "")).sum())
             missing = total - complete
             rate = "{:.0f}%".format(complete / total * 100) if total else "0%"
-            row = _row(ws, row, [field, complete, missing, rate])
+            row = _row(ws, row, [friendly_name, complete, missing, rate])
 
     row += SECTION_GAP
 
