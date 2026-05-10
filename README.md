@@ -1,4 +1,4 @@
-# 🕷️ Scraping Tools
+# 🕷️ Scraping Tools 
 
 Automated web scraping tools with anti-detection capabilities, built with Python.
 
@@ -205,3 +205,9 @@ PROXY_LIST_URL=https://your-proxy-provider.com/list
 ## 📝 License
 
 MIT License - Use responsibly and ethically.
+
+# 1. Aktifkan virtual environment
+C:\xampp\htdocs\scraping> venv\Scripts\activate
+
+# 2. Jalankan server
+(venv) C:\xampp\htdocs\scraping> python webapp/server.py
