@@ -73,3 +73,11 @@ QODER.md
 .kiro/
 .qoder/
 excel_mcp_temp/
+
+# Dashboard
+dashboard.py
+
+# Untracked files to ignore
+.git-safety-rules.md
+webapp/static/css/style_backup_apple.css
+UI_DESIGN_STRUCTURE.md
