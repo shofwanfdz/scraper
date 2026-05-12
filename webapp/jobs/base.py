@@ -11,9 +11,9 @@ from typing import Optional
 
 class BrowserEngine(Enum):
     """Available browser engines for scraping."""
+    API = "api"
     UNDETECTED_CHROME = "uc"
     CLOAKBROWSER = "cloak"
-    CAMOUFOX = "camoufox"
 
 
 # Global references (set by server.py at startup)
