@@ -33,6 +33,38 @@ BORDER = Border(
 )
 
 
+def _safe_int(val):
+    """Safely convert value to int. Returns 0 for empty/invalid values."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return 0
+    # Handle numeric types directly (avoid str(46.0) -> "460" bug)
+    if isinstance(val, (int, float)):
+        return int(val)
+    # For strings: parse "Rp1.234.567", "100+", "1rb+", etc.
+    s = str(val).strip()
+    if not s:
+        return 0
+    # Handle "rb" (ribu/thousand) and "jt" (juta/million) suffixes
+    lower = s.lower().replace("terjual", "").strip()
+    multiplier = 1
+    if "rb" in lower:
+        multiplier = 1000
+        lower = lower.replace("rb", "").strip()
+    elif "jt" in lower:
+        multiplier = 1000000
+        lower = lower.replace("jt", "").strip()
+    # Handle comma as decimal separator (Indonesian format: "4,2" = 4.2)
+    lower = lower.replace(".", "").replace(",", ".").replace("+", "").strip()
+    # Try to parse as float first (handles "4.2" correctly)
+    try:
+        return int(float(lower) * multiplier)
+    except (ValueError, TypeError):
+        pass
+    # Final fallback: extract digits only
+    digits = re.sub(r"[^\d]", "", str(val))
+    return int(digits) if digits else 0
+
+
 def _title(ws, row, text):
     c = ws.cell(row=row, column=1, value=text)
     c.font = TITLE_FONT
@@ -140,14 +172,21 @@ def _scatter_chart(ws, title, x_col, y_col, start_row, end_row, anchor_row):
 def export_with_analytics(products, keyword, filters=None, output_dir="hasil/blibli"):
     df = pd.DataFrame(products)
 
+    # Normalize terjual: could be int, "100+", "1rb+", or "" from API
+    if "terjual" in df.columns:
+        df["terjual"] = df["terjual"].apply(
+            lambda x: _safe_int(x) if pd.notna(x) else None)
+        df["terjual"] = pd.to_numeric(df["terjual"], errors="coerce")
+
     # Ensure numeric columns
     if "harga_angka" not in df.columns and "harga" in df.columns:
-        df["harga_angka"] = df["harga"].apply(lambda x: int(re.sub(r"[^\d]", "", str(x))) if pd.notna(x) else None)
+        df["harga_angka"] = df["harga"].apply(
+            lambda x: _safe_int(x) if pd.notna(x) and str(x).strip() else None)
     df["harga_angka"] = pd.to_numeric(df["harga_angka"], errors="coerce")
 
     if "harga_sebelum_diskon" in df.columns:
         df["harga_asli_angka"] = df["harga_sebelum_diskon"].apply(
-            lambda x: int(re.sub(r"[^\d]", "", str(x))) if pd.notna(x) and str(x).strip() else None)
+            lambda x: _safe_int(x) if pd.notna(x) and str(x).strip() else None)
     else:
         df["harga_asli_angka"] = None
     df["harga_asli_angka"] = pd.to_numeric(df["harga_asli_angka"], errors="coerce")
@@ -167,6 +206,10 @@ def export_with_analytics(products, keyword, filters=None, output_dir="hasil/bli
     filename = "{}_{}_analytics_{}.xlsx".format(marketplace, safe_kw, timestamp)
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, filename)
+
+    # Normalize: API mode uses "nama", HTML/stealth mode uses "nama_produk"
+    if "nama" in df.columns and "nama_produk" not in df.columns:
+        df.rename(columns={"nama": "nama_produk"}, inplace=True)
 
     # Extract brand from product name
     df["brand"] = df["nama_produk"].apply(_extract_brand)
@@ -450,7 +493,7 @@ def _build_penjualan(wb, df):
         for _, r in terlaris.iterrows():
             row = _row(ws, row, [
                 str(r.get("nama_produk", ""))[:50], str(r.get("harga", "")),
-                int(r["terjual"]) if pd.notna(r["terjual"]) else "",
+                _safe_int(r["terjual"]),
                 float(r["rating"]) if pd.notna(r.get("rating")) else "",
             ])
 
@@ -482,7 +525,7 @@ def _build_penjualan(wb, df):
             data_start = row
             row = _header(ws, row, ["Harga (Rp)", "Terjual"])
             for _, r in scatter_df.iterrows():
-                row = _row(ws, row, [int(r["harga_angka"]), int(r["terjual"])])
+                row = _row(ws, row, [_safe_int(r["harga_angka"]), _safe_int(r["terjual"])])
 
             _scatter_chart(ws, "Harga vs Terjual", 1, 2, data_start + 1, data_start + len(scatter_df), data_start)
 
@@ -502,7 +545,7 @@ def _build_diskon(wb, df):
         if "harga_sebelum_diskon" in df.columns and "harga_angka" in df.columns:
             df = df.copy()
             df["harga_asli_angka"] = df["harga_sebelum_diskon"].apply(
-                lambda x: int(re.sub(r"[^\d]", "", str(x))) if pd.notna(x) and str(x).strip() else None)
+                lambda x: int(d) if pd.notna(x) and str(x).strip() and (d := re.sub(r"[^\d]", "", str(x))) else None)
             df["harga_asli_angka"] = pd.to_numeric(df["harga_asli_angka"], errors="coerce")
             mask = df["harga_angka"].notna() & df["harga_asli_angka"].notna() & (df["harga_asli_angka"] > 0)
             df["diskon_persen"] = pd.Series(dtype="float64")
@@ -773,7 +816,7 @@ def _build_best_value(wb, df):
     if "diskon_persen" not in df_bv.columns:
         if "harga_sebelum_diskon" in df_bv.columns and "harga_angka" in df_bv.columns:
             df_bv["harga_asli_angka"] = df_bv["harga_sebelum_diskon"].apply(
-                lambda x: int(re.sub(r"[^\d]", "", str(x))) if pd.notna(x) and str(x).strip() else None)
+                lambda x: _safe_int(x) if pd.notna(x) and str(x).strip() else None)
             df_bv["harga_asli_angka"] = pd.to_numeric(df_bv["harga_asli_angka"], errors="coerce")
             df_bv["diskon_persen"] = pd.Series(dtype="float64")
             mask = df_bv["harga_angka"].notna() & df_bv["harga_asli_angka"].notna() & (df_bv["harga_asli_angka"] > 0)
