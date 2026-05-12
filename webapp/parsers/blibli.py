@@ -118,4 +118,9 @@ def _parse_local(box) -> Optional[dict]:
     if badge_el:
         product["badge"] = badge_el.get_text(strip=True)
 
+    # Dashboard fields: comment_count & liked_count needed for rekomendasi_score
+    product["comment_count"] = product.get("ulasan", 0) or 0
+    product["liked_count"] = product.get("terjual", 0) or 0
+    product["stock"] = 0
+
     return product
