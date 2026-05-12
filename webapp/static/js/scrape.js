@@ -42,18 +42,25 @@ function startScraping() {
     const locationEl = document.getElementById('location');
     if (locationEl && locationEl.value) filters.location = locationEl.value;
 
+    // Engine selection (Blibli only)
+    const engineEl = document.getElementById('engine');
+    const engine = engineEl ? engineEl.value : 'api';
+
     // Show progress, hide form
     formSection.style.display = 'none';
+    progressSection.classList.remove('hidden');
     progressSection.style.display = 'block';
+    resultSection.classList.add('hidden');
     resultSection.style.display = 'none';
     progressLog.innerHTML = '';
+    actionArea.classList.add('hidden');
     actionArea.style.display = 'none';
 
     // Connect WebSocket
-    connectWebSocket(keyword, pages, mode, filters);
+    connectWebSocket(keyword, pages, mode, filters, engine);
 }
 
-function connectWebSocket(keyword, pages, mode, filters) {
+function connectWebSocket(keyword, pages, mode, filters, engine) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.host}/ws/scrape`);
 
@@ -67,6 +74,7 @@ function connectWebSocket(keyword, pages, mode, filters) {
             pages: pages,
             mode: mode,
             filters: filters,
+            engine: engine,
         }));
     };
 
@@ -120,6 +128,7 @@ function addLog(message, type) {
 }
 
 function showActionButton(message) {
+    actionArea.classList.remove('hidden');
     actionArea.style.display = 'block';
     actionMessage.textContent = message;
 }
@@ -127,6 +136,7 @@ function showActionButton(message) {
 function confirmAction() {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ action: 'confirm' }));
+        actionArea.classList.add('hidden');
         actionArea.style.display = 'none';
         addLog('Konfirmasi dikirim ✓', 'status');
     }
@@ -134,6 +144,7 @@ function confirmAction() {
 
 function showResult(msg) {
     progressSection.querySelector('.spinner').style.display = 'none';
+    resultSection.classList.remove('hidden');
     resultSection.style.display = 'block';
     document.getElementById('result-message').textContent =
         `${msg.total} produk berhasil di-scrape!`;
@@ -151,7 +162,9 @@ function showResult(msg) {
 
 function resetForm() {
     formSection.style.display = 'block';
+    progressSection.classList.add('hidden');
     progressSection.style.display = 'none';
+    resultSection.classList.add('hidden');
     resultSection.style.display = 'none';
     if (ws) ws.close();
 }
