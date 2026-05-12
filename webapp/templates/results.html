@@ -3,45 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hasil Scraping</title>
+    <title>Hasil Scraping — Scraping Tools</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <a href="/" class="back-link">← Kembali</a>
-            <h1>📁 Hasil Scraping</h1>
-        </header>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <a href="/" class="navbar-brand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+                Scraping Tools
+            </a>
+            <ul class="navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/results" class="active">Hasil</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+            </ul>
+        </div>
+    </nav>
 
+    <!-- Main Content -->
+    <main class="page">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1>Hasil Scraping</h1>
+            <p class="lead">Semua file hasil ekstraksi data produk dari marketplace</p>
+        </div>
+
+        <!-- Results Container -->
         <section id="results-list">
-            <p>Loading...</p>
+            <!-- Loading state -->
+            <div class="empty-state" id="loading-state">
+                <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                <p class="text-secondary">Memuat data...</p>
+            </div>
         </section>
-    </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Scraping Tools v2.0 — Built for e-commerce data intelligence</p>
+    </footer>
 
     <script>
         async function loadResults() {
-            const res = await fetch('/api/results');
-            const data = await res.json();
             const container = document.getElementById('results-list');
+            const loading = document.getElementById('loading-state');
 
-            if (data.files.length === 0) {
-                container.innerHTML = '<p class="empty">Belum ada hasil scraping.</p>';
-                return;
+            try {
+                const res = await fetch('/api/results');
+                const data = await res.json();
+
+                if (!data.files || data.files.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📁</div>
+                            <div class="empty-state-title">Belum ada hasil scraping</div>
+                            <div class="empty-state-desc">Mulai scraping dari halaman utama untuk menghasilkan data</div>
+                            <a href="/" class="btn primary mt-3">Mulai Scraping</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = `
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Marketplace</th>
+                                    <th>Ukuran</th>
+                                    <th>Tanggal</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                data.files.forEach(f => {
+                    html += `
+                        <tr>
+                            <td style="font-weight:500;">${f.name}</td>
+                            <td><span class="marketplace-badge marketplace-badge--${f.marketplace}">${f.marketplace}</span></td>
+                            <td style="color:var(--text-secondary);">${f.size_kb} KB</td>
+                            <td style="color:var(--text-secondary);">${f.date}</td>
+                            <td>
+                                <a href="/api/download/${f.marketplace}/${f.name}" class="btn primary btn-sm">Download</a>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                container.innerHTML = html;
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-title">Gagal memuat data</div>
+                        <div class="empty-state-desc">${err.message}</div>
+                        <button onclick="loadResults()" class="btn secondary mt-3">Coba Lagi</button>
+                    </div>
+                `;
             }
-
-            let html = '<table class="results-table"><thead><tr><th>File</th><th>Marketplace</th><th>Size</th><th>Tanggal</th><th>Aksi</th></tr></thead><tbody>';
-            data.files.forEach(f => {
-                html += `<tr>
-                    <td>${f.name}</td>
-                    <td><span class="badge badge-${f.marketplace}">${f.marketplace}</span></td>
-                    <td>${f.size_kb} KB</td>
-                    <td>${f.date}</td>
-                    <td><a href="/api/download/${f.marketplace}/${f.name}" class="btn btn-sm">📥 Download</a></td>
-                </tr>`;
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
         }
+
         loadResults();
     </script>
 </body>
