@@ -127,6 +127,9 @@ async def get_dashboard_data(marketplace: str, filename: str):
             "Total Favorit": "liked_count",
             "Jumlah Ulasan": "comment_count",
         }
+        # Normalize: API mode uses "nama", stealth mode uses "nama_produk"
+        if "nama" in df.columns and "nama_produk" not in df.columns:
+            col_rename["nama"] = "nama_produk"
         df.rename(columns={k: v for k, v in col_rename.items() if k in df.columns}, inplace=True)
 
         # Ensure harga_angka exists
@@ -309,10 +312,11 @@ async def websocket_scrape(websocket: WebSocket):
                     pages = msg.get("pages", 1)
                     mode = msg.get("mode", "cepat")
                     filters = msg.get("filters", {})
+                    engine = msg.get("engine", "api")
 
                     thread = threading.Thread(
                         target=run_scraping_job,
-                        args=(job_id, marketplace, keyword, pages, mode, filters),
+                        args=(job_id, marketplace, keyword, pages, mode, filters, engine),
                         daemon=True,
                     )
                     thread.start()
@@ -360,15 +364,24 @@ def wait_for_confirmation(job_id: str, timeout: int = 300) -> bool:
 # SCRAPING JOB RUNNER
 # ============================================================
 
-def run_scraping_job(job_id, marketplace, keyword, pages, mode, filters):
+def run_scraping_job(job_id, marketplace, keyword, pages, mode, filters, engine="api"):
     """Run scraping job in background thread"""
     import time
 
+    # Map engine string to BrowserEngine enum
+    engine_map = {
+        "api": BrowserEngine.API,
+        "cloak": BrowserEngine.CLOAKBROWSER,
+        "uc": BrowserEngine.UNDETECTED_CHROME,
+    }
+    browser_engine = engine_map.get(engine, BrowserEngine.API)
+
     try:
-        send_ws_message(job_id, "status", {"message": "[{}] Memulai proses scraping...".format(marketplace.upper())})
+        engine_label = {"api": "API Direct", "cloak": "CloakBrowser Stealth", "uc": "Undetected Chrome"}.get(engine, engine)
+        send_ws_message(job_id, "status", {"message": "[{}] Memulai proses scraping (engine: {})...".format(marketplace.upper(), engine_label)})
 
         if marketplace == "blibli":
-            result = _run_blibli(job_id, keyword, pages, mode, filters, engine=BrowserEngine.CAMOUFOX)
+            result = _run_blibli(job_id, keyword, pages, mode, filters, engine=browser_engine)
         elif marketplace == "shopee":
             result = _run_shopee(job_id, keyword, pages, mode, filters)
         else:
