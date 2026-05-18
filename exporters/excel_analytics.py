@@ -201,8 +201,10 @@ def export_with_analytics(products, keyword, filters=None, output_dir="hasil/bli
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_kw = re.sub(r"[^\w\s-]", "", keyword).replace(" ", "_")
     marketplace = "blibli"
-    if "shopee" in output_dir.lower():
-        marketplace = "shopee"
+    for mp in ["shopee", "lazada", "tokopedia", "tiktokshop"]:
+        if mp in output_dir.lower():
+            marketplace = mp
+            break
     filename = "{}_{}_analytics_{}.xlsx".format(marketplace, safe_kw, timestamp)
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, filename)
@@ -618,22 +620,34 @@ KNOWN_BRANDS = [
 ]
 
 
+_DB_BRAND_CACHE = None  # None=uninitialized, []=DB unavailable, list=loaded
+
+
+def _load_db_brands_once():
+    """Load DB brands exactly once; on failure mark as unavailable."""
+    global _DB_BRAND_CACHE
+    if _DB_BRAND_CACHE is not None:
+        return _DB_BRAND_CACHE
+    try:
+        from core.brand_manager import BrandManager
+        mgr = BrandManager()
+        _DB_BRAND_CACHE = list(mgr.get_all_brands_from_db() or [])
+    except Exception:
+        _DB_BRAND_CACHE = []
+    return _DB_BRAND_CACHE
+
+
 def _extract_brand(name):
     """Extract brand name from product name. Uses DB brands + fallback list."""
     if not name or not isinstance(name, str):
         return "Lainnya"
 
-    # Try to get brands from database first
-    all_brands = list(KNOWN_BRANDS)
-    try:
-        from core.brand_manager import BrandManager
-        mgr = BrandManager()
-        db_brands = mgr.get_all_brands_from_db()
-        if db_brands:
-            # Merge: DB brands first (more accurate), then fallback
-            all_brands = db_brands + [b for b in KNOWN_BRANDS if b not in db_brands]
-    except Exception:
-        pass
+    # Try DB once then cache result (avoids N retry loops when DB is down)
+    db_brands = _load_db_brands_once()
+    if db_brands:
+        all_brands = db_brands + [b for b in KNOWN_BRANDS if b not in db_brands]
+    else:
+        all_brands = list(KNOWN_BRANDS)
 
     name_upper = name.upper()
     for brand in all_brands:

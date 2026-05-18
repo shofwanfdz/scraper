@@ -41,6 +41,9 @@ init_globals(active_jobs, message_queues)
 # Import job runners
 from webapp.jobs.blibli import run_blibli_job as _run_blibli
 from webapp.jobs.shopee import run_shopee_job as _run_shopee
+from webapp.jobs.lazada import run_lazada_job as _run_lazada
+from webapp.jobs.tokopedia import run_tokopedia_job as _run_tokopedia
+from webapp.jobs.tiktokshop import run_tiktokshop_job as _run_tiktokshop
 from webapp.jobs.base import BrowserEngine
 
 
@@ -81,7 +84,7 @@ async def get_results():
     """Get list of all scraping result files"""
     hasil_dir = Path(__file__).parent.parent / "hasil"
     files = []
-    for marketplace in ["blibli", "shopee"]:
+    for marketplace in ["blibli", "shopee", "lazada", "tokopedia", "tiktokshop"]:
         mp_dir = hasil_dir / marketplace
         if mp_dir.exists():
             for f in sorted(mp_dir.glob("*.xlsx"), key=os.path.getmtime, reverse=True):
@@ -384,6 +387,12 @@ def run_scraping_job(job_id, marketplace, keyword, pages, mode, filters, engine=
             result = _run_blibli(job_id, keyword, pages, mode, filters, engine=browser_engine)
         elif marketplace == "shopee":
             result = _run_shopee(job_id, keyword, pages, mode, filters)
+        elif marketplace == "lazada":
+            result = _run_lazada(job_id, keyword, pages, mode, filters, engine=browser_engine)
+        elif marketplace == "tokopedia":
+            result = _run_tokopedia(job_id, keyword, pages, mode, filters, engine=browser_engine)
+        elif marketplace == "tiktokshop":
+            result = _run_tiktokshop(job_id, keyword, pages, mode, filters, engine=browser_engine)
         else:
             send_ws_message(job_id, "error", {"message": "Marketplace tidak dikenal"})
             return

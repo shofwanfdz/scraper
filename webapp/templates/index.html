@@ -1,290 +1,308 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scraping Tools — E-Commerce Data Platform</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="navbar-inner">
-            <a href="/" class="navbar-brand">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                    <line x1="12" y1="22.08" x2="12" y2="12"/>
-                </svg>
-                Scraping<span>Tools</span>
-            </a>
-            <ul class="navbar-nav">
-                <li><a href="/" class="active">Home</a></li>
-                <li><a href="/results">Hasil</a></li>
-                <li><a href="/dashboard">Dashboard</a></li>
-            </ul>
-            <button class="navbar-toggle" aria-label="Toggle menu">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="6" x2="21" y2="6"/>
-                    <line x1="3" y1="12" x2="21" y2="12"/>
-                    <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-            </button>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <!-- Main Content -->
-    <main class="page">
-        <!-- Hero Section -->
-        <section class="hero">
-            <div class="hero-content">
-                <div class="hero-tag animate-fade-in-up">
-                    <span class="dot"></span>
-                    Platform Aktif
+{% block title %}Scraping Tools — E-Commerce Data Platform{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block content %}
+<!-- INDEX_START_MARKER -->
+<section class="page" x-data="homePage" x-init="initProgress()">
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-tag animate-fade-in-up">
+                <span class="dot dot--green"></span>
+                Platform Aktif
+            </div>
+            <h1 class="animate-fade-in-up delay-1">
+                <span x-text="greeting"></span><br>
+                Data <span class="accent">marketplace</span> di ujung jari
+            </h1>
+            <p class="animate-fade-in-up delay-2">Ekstraksi data produk dari marketplace Indonesia secara otomatis. Cepat, akurat, dan lengkap dengan analitik canggih.</p>
+            <div class="hero-stats animate-fade-in-up delay-3">
+                <div class="hero-stat">
+                    <span class="hero-stat-value">5</span>
+                    <span class="hero-stat-label">Marketplaces</span>
                 </div>
-                <h1 class="animate-fade-in-up" style="animation-delay:0.1s">
-                    Data produk<br>
-                    <span class="accent">marketplace</span> di ujung jari
-                </h1>
-                <p class="animate-fade-in-up" style="animation-delay:0.2s">Ekstraksi data produk dari marketplace Indonesia secara otomatis. Cepat, akurat, dan lengkap dengan analitik canggih.</p>
-                <div class="hero-stats animate-fade-in-up" style="animation-delay:0.3s">
-                    <div class="hero-stat">
-                        <span class="hero-stat-value">2+</span>
-                        <span class="hero-stat-label">Marketplaces</span>
-                    </div>
-                    <div class="hero-stat">
-                        <span class="hero-stat-value">9</span>
-                        <span class="hero-stat-label">Sheet Analytics</span>
-                    </div>
-                    <div class="hero-stat">
-                        <span class="hero-stat-value">21+</span>
-                        <span class="hero-stat-label">Charts</span>
-                    </div>
+                <div class="hero-stat">
+                    <span class="hero-stat-value">9</span>
+                    <span class="hero-stat-label">Sheet Analytics</span>
                 </div>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;" class="animate-fade-in-up" style="animation-delay:0.4s">
-                    <a href="/scrape/blibli" class="btn primary">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                        </svg>
-                        Mulai Scraping
-                    </a>
-                    <a href="/dashboard" class="btn secondary">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <rect x="3" y="3" width="7" height="7"/>
-                            <rect x="14" y="3" width="7" height="7"/>
-                            <rect x="3" y="14" width="7" height="7"/>
-                            <rect x="14" y="14" width="7" height="7"/>
-                        </svg>
-                        Lihat Dashboard
-                    </a>
+                <div class="hero-stat">
+                    <span class="hero-stat-value">21+</span>
+                    <span class="hero-stat-label">Charts</span>
                 </div>
             </div>
-            <div class="hero-visual animate-fade-in-up" style="animation-delay:0.25s">
-                <div class="hero-visual-card">
-                    <div class="hero-visual-header">
-                        <span class="hero-visual-title">Progress Scraping</span>
-                        <span class="hero-visual-badge">Live</span>
+            <div class="hero-actions animate-fade-in-up delay-4">
+                <a href="/scrape/blibli" class="btn primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Mulai Scraping
+                </a>
+                <a href="/dashboard" class="btn secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    Lihat Dashboard
+                </a>
+            </div>
+        </div>
+        <div class="hero-visual animate-fade-in-up delay-25">
+            <div class="hero-visual-card">
+                <div class="hero-visual-header">
+                    <span class="hero-visual-title">Progress Scraping</span>
+                    <span class="hero-visual-badge">Live</span>
+                </div>
+                <div class="hero-live-panel" aria-hidden="true">
+                    <div class="hero-live-bars">
+                        <template x-for="(bar, index) in progressBars" :key="index">
+                            <span :style="`height:${bar}%`"></span>
+                        </template>
                     </div>
-                    <div class="hero-progress">
-                        <div class="hero-progress-bar" style="width:72%;"></div>
+                    <div class="hero-live-meta">
+                        <div class="hero-live-chip">
+                            <span class="hero-live-chip-label">Batch</span>
+                            <strong x-text="`${liveProgress.batch}/${liveProgress.totalBatch}`"></strong>
+                        </div>
+                        <div class="hero-live-chip">
+                            <span class="hero-live-chip-label">Kecepatan</span>
+                            <strong x-text="`${liveProgress.speed} item/mnt`"></strong>
+                        </div>
+                        <div class="hero-live-chip">
+                            <span class="hero-live-chip-label">Marketplace</span>
+                            <strong x-text="liveProgress.marketplace"></strong>
+                        </div>
                     </div>
-                    <div class="hero-progress-info">
-                        <span>720 / 1000 produk</span>
-                        <span>72%</span>
-                    </div>
+                </div>
+                <div
+                    class="hero-progress"
+                    role="progressbar"
+                    aria-label="Progress scraping homepage"
+                    aria-valuemin="0"
+                    :aria-valuemax="liveProgress.target"
+                    :aria-valuenow="liveProgress.current"
+                    :aria-valuetext="`${liveProgress.current.toLocaleString('id-ID')} dari ${liveProgress.target.toLocaleString('id-ID')} produk (${liveProgress.percent}%)`"
+                >
+                    <div class="hero-progress-bar" :style="`width:${liveProgress.percent}%`"></div>
+                </div>
+                <div class="hero-progress-info">
+                    <span x-text="`${liveProgress.current.toLocaleString('id-ID')} / ${liveProgress.target.toLocaleString('id-ID')} produk`"></span>
+                    <span x-text="`${liveProgress.percent}%`"></span>
+                </div>
+                <div class="hero-progress-caption">
+                    <span class="hero-progress-pulse"></span>
+                    <span x-text="liveProgress.status"></span>
                 </div>
             </div>
-        </section>
-
-        <!-- Quick Actions -->
-        <div class="quick-actions">
-            <a href="/results" class="quick-action">
-                <div class="quick-action-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                </div>
-                <span class="quick-action-text">Lihat Hasil</span>
-            </a>
-            <a href="/dashboard" class="quick-action">
-                <div class="quick-action-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"/>
-                        <rect x="14" y="3" width="7" height="7"/>
-                        <rect x="3" y="14" width="7" height="7"/>
-                        <rect x="14" y="14" width="7" height="7"/>
-                    </svg>
-                </div>
-                <span class="quick-action-text">Dashboard</span>
-            </a>
         </div>
+    </section>
 
-        <!-- Marketplace Cards -->
-        <div class="marketplace-grid animate-fade-in-up" style="animation-delay:0.35s">
-            <!-- Blibli Card -->
-            <a href="/scrape/blibli" class="mp-card">
+    <!-- Section heading -->
+    <section class="section-heading animate-fade-in-up delay-32">
+        <h2>Marketplace yang Didukung</h2>
+        <p>Pilih marketplace untuk mulai scraping data produk</p>
+    </section>
+
+    <!-- Marketplace Cards (Alpine driven) -->
+    <div class="marketplace-grid animate-fade-in-up delay-35">
+        <template x-for="mp in marketplaces" :key="mp.id">
+            <a :href="'/scrape/' + mp.id" class="mp-card">
                 <div class="mp-card-header">
-                    <div class="mp-card-icon blibli">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="9" cy="21" r="1"/>
-                            <circle cx="20" cy="21" r="1"/>
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                        </svg>
+                    <div class="mp-card-icon" :class="mp.id">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" x-html="mp.iconPath"></svg>
                     </div>
                     <div>
-                        <div class="mp-card-name">Blibli</div>
-                        <div style="font-size:0.85rem;color:var(--ink-3);">Full Otomatis</div>
+                        <div class="mp-card-name" x-text="mp.name"></div>
+                        <div class="mp-card-mode" x-text="mp.mode"></div>
                     </div>
                 </div>
-                <p class="mp-card-desc">Tanpa login, tanpa CAPTCHA. Scraping cepat via API atau browser stealth dengan anti-detection.</p>
+                <p class="mp-card-desc" x-text="mp.desc"></p>
                 <div class="mp-card-features">
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        Tanpa CAPTCHA
-                    </span>
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        CloakBrowser
-                    </span>
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        Auto Brand
-                    </span>
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        Filter Lengkap
-                    </span>
+                    <template x-for="feat in mp.features" :key="feat">
+                        <span class="mp-card-feature">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span x-text="feat"></span>
+                        </span>
+                    </template>
                 </div>
                 <div class="mp-card-action">
-                    <span style="font-size:0.9rem;color:var(--ink-2);">Scraping sekarang</span>
+                    <span class="mp-card-action-text">Scraping sekarang</span>
                     <span class="btn btn-sm primary">Mulai →</span>
                 </div>
             </a>
+        </template>
+    </div>
 
-            <!-- Shopee Card -->
-            <a href="/scrape/shopee" class="mp-card">
-                <div class="mp-card-header">
-                    <div class="mp-card-icon shopee">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="mp-card-name">Shopee</div>
-                        <div style="font-size:0.85rem;color:var(--ink-3);">Semi-Otomatis</div>
-                    </div>
-                </div>
-                <p class="mp-card-desc">API intercept untuk CSR pages. Perlu login Google sekali untuk autentikasi awal.</p>
-                <div class="mp-card-features">
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        Login 1x
-                    </span>
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        60/halaman
-                    </span>
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        CAPTCHA 1x
-                    </span>
-                    <span class="mp-card-feature">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        Stealth Mode
-                    </span>
-                </div>
-                <div class="mp-card-action">
-                    <span style="font-size:0.9rem;color:var(--ink-2);">Scraping sekarang</span>
-                    <span class="btn btn-sm primary">Mulai →</span>
-                </div>
-            </a>
-        </div>
-
-        <!-- Features Grid -->
-        <div class="features-grid animate-fade-in-up" style="animation-delay:0.5s">
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                    </svg>
-                </div>
-                <div class="feature-title">Scraping Cepat</div>
-                <div class="feature-desc">API direct mode untuk kecepatan maksimal tanpa render browser</div>
+    <!-- Tips Carousel -->
+    <section class="tips-section animate-fade-in-up delay-5" x-data="tipsCarousel">
+        <div class="tips-card">
+            <div class="tips-header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                <span class="tips-label">Tips</span>
             </div>
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                </div>
-                <div class="feature-title">Anti-Detection</div>
-                <div class="feature-desc">CloakBrowser dengan fingerprint rotation untuk bypass anti-bot</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="20" x2="18" y2="10"/>
-                        <line x1="12" y1="20" x2="12" y2="4"/>
-                        <line x1="6" y1="20" x2="6" y2="14"/>
-                    </svg>
-                </div>
-                <div class="feature-title">Analytics Excel</div>
-                <div class="feature-desc">Export 9 sheets dengan 21 charts dan rekomendasi otomatis</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                </div>
-                <div class="feature-title">Real-time Progress</div>
-                <div class="feature-desc">WebSocket live update untuk monitoring proses scraping</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                        <line x1="7" y1="7" x2="7.01" y2="7"/>
-                    </svg>
-                </div>
-                <div class="feature-title">Brand Detection</div>
-                <div class="feature-desc">Identifikasi brand otomatis dari nama produk dan seller</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="20" x2="12" y2="10"/>
-                        <line x1="18" y1="20" x2="18" y2="4"/>
-                        <line x1="6" y1="20" x2="6" y2="16"/>
-                    </svg>
-                </div>
-                <div class="feature-title">Dashboard Visual</div>
-                <div class="feature-desc">Visualisasi data interaktif dengan Plotly charts</div>
+            <p class="tips-text" x-text="tips[current]"></p>
+            <div class="tips-dots">
+                <template x-for="(tip, i) in tips" :key="i">
+                    <button class="tips-dot" :class="{ active: i === current }" @click="current = i" :aria-label="'Tip ' + (i+1)"></button>
+                </template>
             </div>
         </div>
-    </main>
+    </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-inner">
-            <span class="footer-text">Scraping Tools v2.0 — Built for e-commerce data intelligence</span>
-            <div class="footer-links">
-                <a href="/results">Hasil</a>
-                <a href="/dashboard">Dashboard</a>
+    <!-- Features Grid -->
+    <div class="features-grid animate-fade-in-up delay-55">
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </div>
+            <div class="feature-title">Scraping Cepat</div>
+            <div class="feature-desc">API direct mode untuk kecepatan maksimal tanpa render browser</div>
         </div>
-    </footer>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="feature-title">Anti-Detection</div>
+            <div class="feature-desc">CloakBrowser dengan fingerprint rotation untuk bypass anti-bot</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </div>
+            <div class="feature-title">Analytics Excel</div>
+            <div class="feature-desc">Export 9 sheets dengan 21 charts dan rekomendasi otomatis</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="feature-title">Real-time Progress</div>
+            <div class="feature-desc">WebSocket live update untuk monitoring proses scraping</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            </div>
+            <div class="feature-title">Brand Detection</div>
+            <div class="feature-desc">Identifikasi brand otomatis dari nama produk dan seller</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+            </div>
+            <div class="feature-title">Dashboard Visual</div>
+            <div class="feature-desc">Visualisasi data interaktif dengan Plotly charts</div>
+        </div>
+    </div>
+</section>
+{% endblock %}
 
-    <!-- Mobile Menu Script -->
-    <script>
-        document.querySelector('.navbar-toggle')?.addEventListener('click', function() {
-            document.querySelector('.navbar-nav')?.classList.toggle('open');
-        });
-    </script>
-</body>
-</html>
+{% block scripts %}
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('homePage', () => ({
+        progressTimer: null,
+        liveProgress: {
+            current: 720,
+            target: 1000,
+            percent: 72,
+            batch: 6,
+            totalBatch: 8,
+            speed: 128,
+            marketplace: 'Blibli',
+            status: 'Menyiapkan batch produk dan validasi harga secara real-time'
+        },
+        progressBars: [38, 62, 44, 76, 58, 88, 64, 82, 54, 92, 68, 80],
+        get greeting() {
+            const h = new Date().getHours();
+            if (h < 5) return 'Selamat malam 🌙';
+            if (h < 11) return 'Selamat pagi ☀️';
+            if (h < 15) return 'Selamat siang 🌤️';
+            if (h < 18) return 'Selamat sore 🌅';
+            return 'Selamat malam 🌙';
+        },
+        initProgress() {
+            const marketplaces = ['Blibli', 'Shopee', 'Lazada', 'Tokopedia', 'TikTok Shop'];
+            const statuses = [
+                'Menyiapkan batch produk dan validasi harga secara real-time',
+                'Mengambil listing terbaru dan sinkronisasi metadata seller',
+                'Memproses detail diskon, rating, dan performa katalog',
+                'Menyusun dataset siap analitik untuk dashboard interaktif'
+            ];
+
+            this.progressTimer = setInterval(() => {
+                const step = Math.floor(Math.random() * 24) + 8;
+                let nextCurrent = this.liveProgress.current + step;
+                if (nextCurrent >= this.liveProgress.target) {
+                    nextCurrent = Math.floor(this.liveProgress.target * 0.58);
+                }
+
+                const percent = Math.max(12, Math.min(98, Math.round((nextCurrent / this.liveProgress.target) * 100)));
+                const batch = Math.min(this.liveProgress.totalBatch, Math.max(1, Math.ceil(percent / (100 / this.liveProgress.totalBatch))));
+
+                this.liveProgress = {
+                    ...this.liveProgress,
+                    current: nextCurrent,
+                    percent,
+                    batch,
+                    speed: 96 + Math.floor(Math.random() * 72),
+                    marketplace: marketplaces[Math.floor(Math.random() * marketplaces.length)],
+                    status: statuses[Math.floor(Math.random() * statuses.length)]
+                };
+
+                this.progressBars = this.progressBars.map((bar, index) => {
+                    const delta = Math.floor(Math.random() * 34) - 17 + (index % 3 === 0 ? 8 : 0);
+                    return Math.max(24, Math.min(100, bar + delta));
+                });
+            }, 1600);
+        },
+        destroy() {
+            if (this.progressTimer) clearInterval(this.progressTimer);
+        },
+        marketplaces: [
+            {
+                id: 'blibli', name: 'Blibli', mode: 'Full Otomatis',
+                desc: 'Tanpa login, tanpa CAPTCHA. Scraping cepat via API atau browser stealth dengan anti-detection.',
+                features: ['Tanpa CAPTCHA', 'CloakBrowser', 'Auto Brand', 'Filter Lengkap'],
+                iconPath: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'
+            },
+            {
+                id: 'shopee', name: 'Shopee', mode: 'Semi-Otomatis',
+                desc: 'API intercept untuk CSR pages. Perlu login Google sekali untuk autentikasi awal.',
+                features: ['Login 1x', '60/halaman', 'CAPTCHA 1x', 'Stealth Mode'],
+                iconPath: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'
+            },
+            {
+                id: 'lazada', name: 'Lazada', mode: 'Full Otomatis',
+                desc: 'Browser automation untuk CSR pages. Tanpa login, tanpa CAPTCHA. Anti-bot ringan.',
+                features: ['Tanpa Login', '40/halaman', 'UC Browser', 'Filter Harga'],
+                iconPath: '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>'
+            },
+            {
+                id: 'tokopedia', name: 'Tokopedia', mode: 'Headless + GraphQL',
+                desc: 'Headless CloakBrowser anti-detection + GraphQL intercept. 60% lebih hemat RAM.',
+                features: ['Tanpa Login', '60/halaman', 'Headless Mode', 'Filter Lengkap'],
+                iconPath: '<circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/>'
+            },
+            {
+                id: 'tiktokshop', name: 'TikTok Shop', mode: 'HTTP Direct (SSR)',
+                desc: 'HTTP direct tanpa browser — 99% hemat RAM. SSR extraction super cepat.',
+                features: ['Tanpa Browser', 'Super Cepat', 'Tanpa Login', '99% Hemat RAM'],
+                iconPath: '<path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/>'
+            }
+        ]
+    }));
+
+    Alpine.data('tipsCarousel', () => ({
+        current: 0,
+        tips: [
+            'Gunakan mode "fast" untuk scraping cepat tanpa detail lengkap.',
+            'Filter harga dan rating tersedia untuk Blibli, Lazada, dan Tokopedia.',
+            'Hasil scraping otomatis tersimpan di folder hasil/ dalam format Excel.',
+            'Dashboard analytics mendukung filter brand, kota, dan seller.',
+            'Gunakan Command Palette (⌘K) untuk navigasi cepat antar halaman.'
+        ],
+        init() {
+            setInterval(() => { this.current = (this.current + 1) % this.tips.length; }, 6000);
+        }
+    }));
+});
+</script>
+{% endblock %}
+

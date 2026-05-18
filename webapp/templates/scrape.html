@@ -1,36 +1,9 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrape {{ marketplace|title }} — Scraping Tools</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="navbar-inner">
-            <a href="/" class="navbar-brand">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                    <line x1="12" y1="22.08" x2="12" y2="12"/>
-                </svg>
-                Scraping Tools
-            </a>
-            <ul class="navbar-nav">
-                <li><a href="/">Home</a></li>
-                <li><a href="/results">Hasil</a></li>
-                <li><a href="/dashboard">Dashboard</a></li>
-            </ul>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <!-- Main Content -->
-    <main class="page page-narrow">
+{% block title %}Scrape {{ marketplace|title }} — Scraping Tools{% endblock %}
+
+{% block content %}
+<section class="page page-narrow">
         <!-- Page Header -->
         <div class="page-header">
             <h1>Scrape {{ marketplace|title }}</h1>
@@ -123,6 +96,43 @@
                             </select>
                         </div>
                     </div>
+                    {% elif marketplace == "lazada" %}
+                    <!-- Lazada-specific options -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Metode Scraping</label>
+                            <select id="engine">
+                                <option value="uc">🌐 Undetected Chrome (Recommended)</option>
+                                <option value="cloak">🛡️ CloakBrowser (Fallback)</option>
+                            </select>
+                            <p class="form-hint">UC paling stabil untuk Lazada</p>
+                        </div>
+                    </div>
+                    {% elif marketplace == "tokopedia" %}
+                    <!-- Tokopedia-specific options -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Metode Scraping</label>
+                            <select id="engine">
+                                <option value="cloak">🛡️ Headless CloakBrowser (Recommended)</option>
+                                <option value="uc">🌐 Undetected Chrome + GraphQL</option>
+                            </select>
+                            <p class="form-hint">Headless 60% lebih hemat RAM, UC untuk data lebih lengkap</p>
+                        </div>
+                    </div>
+                    {% elif marketplace == "tiktokshop" %}
+                    <!-- TikTok Shop-specific options -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Metode Scraping</label>
+                            <select id="engine">
+                                <option value="api">⚡ HTTP Direct — Tanpa Browser (Recommended)</option>
+                                <option value="cloak">🛡️ Headless CloakBrowser</option>
+                                <option value="uc">🌐 Undetected Chrome Stealth</option>
+                            </select>
+                            <p class="form-hint">HTTP Direct paling cepat & hemat RAM (SSR extraction)</p>
+                        </div>
+                    </div>
                     {% endif %}
 
                     <!-- Submit -->
@@ -174,16 +184,12 @@
                 </div>
             </div>
         </section>
-    </main>
+</section>
+{% endblock %}
 
-    <!-- Footer -->
-    <footer class="footer">
-        <p>Scraping Tools v2.0 — Built for e-commerce data intelligence</p>
-    </footer>
-
-    <script>
-        const MARKETPLACE = "{{ marketplace }}";
-    </script>
-    <script src="/static/js/scrape.js?v=2"></script>
-</body>
-</html>
+{% block scripts %}
+<script>
+    const MARKETPLACE = "{{ marketplace }}";
+</script>
+<script src="/static/js/scrape.js?v=2"></script>
+{% endblock %}

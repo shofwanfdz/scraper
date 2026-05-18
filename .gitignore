@@ -82,4 +82,26 @@ dashboard.py
 webapp/static/css/style_backup_apple.css
 UI_DESIGN_STRUCTURE.md
 
+# Local untracked work files
+_analyze_cheapest.py
+core/captcha_solver.py
+docs/UI_REDESIGN_PROMPT.md
+scrapers/lazada_scraper.py
+scrapers/tiktokshop_scraper.py
+scrapers/tokopedia_scraper.py
+test_api_final.py
+test_backend_api.py
+test_backend_api_enhanced.py
+test_blibli_api.py
+test_final_summary.py
+test_lazada_api.py
+webapp/index1.html
+webapp/jobs/lazada.py
+webapp/jobs/tiktokshop.py
+webapp/jobs/tokopedia.py
+webapp/parsers/lazada.py
+webapp/parsers/tiktokshop.py
+webapp/parsers/tokopedia.py
+webapp/templates/base.html
+
 README.md
